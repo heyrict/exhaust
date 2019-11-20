@@ -1,0 +1,25 @@
+[package]
+name = "exhaust"
+version = "0.1.0"
+authors = ["heyrict <xiezh0831@yahoo.co.jp>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+unicode-width = "0.1.5"
+crossterm = "0.13"
+bitflags = "^1.2"
+
+serde = { version = "^1.0", features = ["derive"] }
+serde_json = "^1.0"
+
+[dependencies.tui]
+git = "https://github.com/heyrict/tui-rs"
+branch = "merge-crossterm-refactor"
+default-features = false
+features = ["crossterm"]
+
+[profile.release]
+codegen-units = 1
+lto = true
