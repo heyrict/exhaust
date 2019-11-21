@@ -2,16 +2,9 @@ use crate::app::*;
 use crate::event::*;
 use std::fs::File;
 use std::io::Write;
+use std::thread;
 
 pub fn reduce(state: &mut App, event: Messages) -> Option<Messages> {
-    let mut file = File::create("/tmp/temp.json").expect("Error opening /tmp/temp.json");
-    file.write_all(
-        serde_json::to_string(&state.exam)
-            .expect("Error converting exam to json")
-            .as_ref(),
-    )
-    .expect("Error writing /tmp/temp.json");
-
     // Route handler
     match event {
         Messages::ChangeRoute(route) => {
@@ -22,7 +15,7 @@ pub fn reduce(state: &mut App, event: Messages) -> Option<Messages> {
             AppRoute::DoExam(display) => {
                 let index = display.question_index;
                 let question = state.exam.as_mut().unwrap().question_at_mut(index)?;
-                match question {
+                let returns = match question {
                     Item::Question(q) => {
                         if !q.has_selection(sel) {
                             None
@@ -36,7 +29,27 @@ pub fn reduce(state: &mut App, event: Messages) -> Option<Messages> {
                         }
                     }
                     _ => None,
-                }
+                };
+
+                // Save data on selection change
+                match &event {
+                    Messages::ToggleSelection(_) => {
+                        let exam_copy = state.exam.clone();
+                        thread::spawn(move || {
+                            let mut file = File::create("/tmp/temp.json")
+                                .expect("Error opening /tmp/temp.json");
+                            file.write_all(
+                                serde_json::to_string(&exam_copy)
+                                    .expect("Error converting exam to json")
+                                    .as_ref(),
+                            )
+                            .expect("Error writing /tmp/temp.json");
+                        });
+                    }
+                    _ => {}
+                };
+
+                returns
             }
             _ => Some(event),
         },

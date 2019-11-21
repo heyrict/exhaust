@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct Selection {
     pub text: String,
     pub should_select: bool,
@@ -31,7 +31,7 @@ pub trait HasQuestionResult {
     fn get_result(&self) -> QuestionResult;
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct Question {
     pub question: String,
     pub selections: Vec<Selection>,
@@ -68,19 +68,19 @@ impl HasQuestionResult for Question {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct Card {
     question: String,
     answer: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub enum Item {
     Question(Question),
     Card(Card),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Exam {
     pub questions: Vec<Item>,
     #[serde(default)]
