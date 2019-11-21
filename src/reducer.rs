@@ -38,14 +38,14 @@ pub fn reduce(state: &mut App, event: Messages) -> Option<Messages> {
                         if display.question_index < max_index {
                             display.question_index + 1
                         } else {
-                            max_index
+                            0
                         }
                     }
                     UpdateQuestionIndexEvent::Prev => {
                         if display.question_index > 0 {
                             display.question_index - 1
                         } else {
-                            0
+                            max_index
                         }
                     }
                     UpdateQuestionIndexEvent::Set(index) => {
@@ -65,6 +65,13 @@ pub fn reduce(state: &mut App, event: Messages) -> Option<Messages> {
             }
             _ => None,
         },
+        Messages::ToggleExamResult => {
+            state.exam.result = match &state.exam.result {
+                ExamResult::Done => ExamResult::Pending,
+                ExamResult::Pending => ExamResult::Done,
+            };
+            None
+        }
         _ => Some(event),
     }
 }

@@ -18,6 +18,7 @@ pub enum Messages {
     ChangeRoute(AppRoute),
     UpdateQuestionIndex(UpdateQuestionIndexEvent),
     ToggleSelection(SelectionFlags),
+    ToggleExamResult,
     Quit,
 }
 

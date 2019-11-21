@@ -90,8 +90,14 @@ impl<'a> ExamWidget<'a> {
     }
 
     pub fn propagate(state: &App, event: Messages, tx: mpsc::Sender<Messages>) -> Option<Messages> {
-        ExamItemsWidget::propagate(state, event, tx.clone())
-            .and_then(|event| ItemWidget::propagate(state, event, tx))
+        match &event {
+            Messages::Input(InputEvent::Keyboard(KeyEvent::Char(' '))) => {
+                tx.send(Messages::ToggleExamResult).unwrap();
+                None
+            }
+            _ => ExamItemsWidget::propagate(state, event, tx.clone())
+                .and_then(|event| ItemWidget::propagate(state, event, tx)),
+        }
     }
 }
 
@@ -325,7 +331,8 @@ impl<'a> ExamItemsWidget<'a> {
                         };
                         if current_index == index {
                             style.modifier = Modifier::BOLD;
-                            style.fg = Color::Magenta;
+                            style.fg = style.bg;
+                            style.bg = Color::Rgb(209, 162, 226);
                         };
                         texts.push(Text::styled(format!("{:3}", &index + 1), style));
                     }
@@ -333,7 +340,8 @@ impl<'a> ExamItemsWidget<'a> {
                         let mut style = PENDING_STYLE;
                         if current_index == index {
                             style.modifier = Modifier::BOLD;
-                            style.fg = Color::Magenta;
+                            style.fg = style.bg;
+                            style.bg = Color::Magenta;
                         };
                         texts.push(Text::styled(format!("{:3}", &index + 1), style));
                     }
