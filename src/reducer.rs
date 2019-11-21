@@ -8,24 +8,28 @@ pub fn reduce(state: &mut App, event: Messages) -> Option<Messages> {
             state.route = route;
             None
         }
-        Messages::ToggleSelection(sel) => {
-            if let AppRoute::DoExam(display) = &state.route {
+        Messages::ToggleSelection(sel) => match &state.route {
+            AppRoute::DoExam(display) => {
                 let index = display.question_index;
                 let question = state.exam.question_at_mut(index)?;
                 match question {
                     Item::Question(q) => {
-                        if q.num_should_selects() == 1usize {
-                            q.user_selection = sel;
+                        if !q.has_selection(sel) {
+                            None
                         } else {
-                            q.user_selection ^= sel;
+                            if q.num_should_selects() == 1usize {
+                                q.user_selection = sel;
+                            } else {
+                                q.user_selection ^= sel;
+                            };
+                            None
                         }
-                        return None;
                     }
-                    _ => {}
-                };
-            };
-            Some(event)
-        }
+                    _ => None,
+                }
+            }
+            _ => Some(event),
+        },
         Messages::UpdateQuestionIndex(evt) => match &state.route {
             AppRoute::DoExam(display) => {
                 let max_index = state.exam.num_questions() - 1;

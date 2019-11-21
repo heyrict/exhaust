@@ -267,38 +267,43 @@ impl<'a> ExamItemsWidget<'a> {
             bg: Color::Gray,
             modifier: Modifier::empty(),
         };
-
         const CURRENT_STYLE: Style = Style {
             fg: Color::Gray,
             bg: Color::Magenta,
             modifier: Modifier::BOLD,
         };
-
         const DONE_STYLE: Style = Style {
             fg: Color::White,
             bg: Color::Blue,
             modifier: Modifier::empty(),
         };
-
         const WRONG_STYLE: Style = Style {
             fg: Color::White,
             bg: Color::Red,
             modifier: Modifier::empty(),
         };
-
         const CORRECT_STYLE: Style = Style {
             fg: Color::White,
             bg: Color::Green,
             modifier: Modifier::empty(),
         };
 
+        let qitems = self.app.exam.questions.iter().enumerate();
+
         match self.app.exam.result {
-            ExamResult::Pending => (0..self.app.exam.questions.len()).for_each(|index| {
+            ExamResult::Pending => qitems.for_each(|(index, item)| {
                 // Text
                 if index == current_index {
                     texts.push(Text::styled(format!("{:3}", &index + 1), CURRENT_STYLE));
                 } else {
-                    texts.push(Text::styled(format!("{:3}", &index + 1), PENDING_STYLE));
+                    let style = match item {
+                        Item::Question(question) => match question.get_result() {
+                            QuestionResult::Pending => PENDING_STYLE,
+                            _ => DONE_STYLE,
+                        },
+                        _ => DONE_STYLE,
+                    };
+                    texts.push(Text::styled(format!("{:3}", &index + 1), style));
                 }
 
                 // Separator
@@ -308,46 +313,39 @@ impl<'a> ExamItemsWidget<'a> {
                     texts.push(Text::raw(" "));
                 }
             }),
-            ExamResult::Done => {
-                self.app
-                    .exam
-                    .questions
-                    .iter()
-                    .enumerate()
-                    .for_each(|(index, item)| {
-                        // Text
-                        match item {
-                            Item::Question(question) => {
-                                let mut style = match question.get_result() {
-                                    QuestionResult::Correct => CORRECT_STYLE,
-                                    QuestionResult::Wrong => WRONG_STYLE,
-                                    QuestionResult::Pending => PENDING_STYLE,
-                                    QuestionResult::Done => DONE_STYLE,
-                                };
-                                if current_index == index {
-                                    style.modifier = Modifier::BOLD;
-                                    style.fg = Color::Magenta;
-                                };
-                                texts.push(Text::styled(format!("{:3}", &index + 1), style));
-                            }
-                            Item::Card(_) => {
-                                let mut style = PENDING_STYLE;
-                                if current_index == index {
-                                    style.modifier = Modifier::BOLD;
-                                    style.fg = Color::Magenta;
-                                };
-                                texts.push(Text::styled(format!("{:3}", &index + 1), style));
-                            }
+            ExamResult::Done => qitems.for_each(|(index, item)| {
+                // Text
+                match item {
+                    Item::Question(question) => {
+                        let mut style = match question.get_result() {
+                            QuestionResult::Correct => CORRECT_STYLE,
+                            QuestionResult::Wrong => WRONG_STYLE,
+                            QuestionResult::Pending => PENDING_STYLE,
+                            QuestionResult::Done => DONE_STYLE,
                         };
+                        if current_index == index {
+                            style.modifier = Modifier::BOLD;
+                            style.fg = Color::Magenta;
+                        };
+                        texts.push(Text::styled(format!("{:3}", &index + 1), style));
+                    }
+                    Item::Card(_) => {
+                        let mut style = PENDING_STYLE;
+                        if current_index == index {
+                            style.modifier = Modifier::BOLD;
+                            style.fg = Color::Magenta;
+                        };
+                        texts.push(Text::styled(format!("{:3}", &index + 1), style));
+                    }
+                };
 
-                        // Separator
-                        if index % 4 == 3 {
-                            texts.push(Text::raw("\n"));
-                        } else {
-                            texts.push(Text::raw(" "));
-                        }
-                    })
-            }
+                // Separator
+                if index % 4 == 3 {
+                    texts.push(Text::raw("\n"));
+                } else {
+                    texts.push(Text::raw(" "));
+                }
+            }),
         }
 
         Paragraph::new(texts.iter())

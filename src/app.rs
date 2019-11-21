@@ -150,6 +150,10 @@ impl Question {
             .collect::<Vec<&Selection>>()
             .len()
     }
+
+    pub fn has_selection(&self, selection: SelectionFlags) -> bool {
+        selection.bits() >> self.selections.len() == 0
+    }
 }
 
 pub fn get_sample_app() -> App {
