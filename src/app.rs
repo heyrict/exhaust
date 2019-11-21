@@ -120,7 +120,7 @@ pub enum AppRoute {
 }
 
 pub struct App {
-    pub exam: Exam,
+    pub exam: Option<Exam>,
     pub route: AppRoute,
 }
 
@@ -158,7 +158,7 @@ impl Question {
 
 pub fn get_sample_app() -> App {
     App {
-        exam: Exam {
+        exam: Some(Exam {
             questions: vec![
                 Item::Question(Question {
                     question: "Game Over. Continue?".to_owned(),
@@ -192,7 +192,7 @@ pub fn get_sample_app() -> App {
                 }),
             ],
             result: ExamResult::Pending,
-        },
+        }),
         route: AppRoute::Home,
     }
 }

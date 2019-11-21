@@ -11,7 +11,7 @@ pub fn reduce(state: &mut App, event: Messages) -> Option<Messages> {
         Messages::ToggleSelection(sel) => match &state.route {
             AppRoute::DoExam(display) => {
                 let index = display.question_index;
-                let question = state.exam.question_at_mut(index)?;
+                let question = state.exam.as_mut().unwrap().question_at_mut(index)?;
                 match question {
                     Item::Question(q) => {
                         if !q.has_selection(sel) {
@@ -32,7 +32,7 @@ pub fn reduce(state: &mut App, event: Messages) -> Option<Messages> {
         },
         Messages::UpdateQuestionIndex(evt) => match &state.route {
             AppRoute::DoExam(display) => {
-                let max_index = state.exam.num_questions() - 1;
+                let max_index = state.exam.as_mut().unwrap().num_questions() - 1;
                 let next_index = match &evt {
                     UpdateQuestionIndexEvent::Next => {
                         if display.question_index < max_index {
@@ -66,7 +66,7 @@ pub fn reduce(state: &mut App, event: Messages) -> Option<Messages> {
             _ => None,
         },
         Messages::ToggleExamResult => {
-            state.exam.result = match &state.exam.result {
+            state.exam.as_mut().unwrap().result = match state.exam.as_ref().unwrap().result {
                 ExamResult::Done => ExamResult::Pending,
                 ExamResult::Pending => ExamResult::Done,
             };
