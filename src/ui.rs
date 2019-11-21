@@ -2,6 +2,7 @@ use crate::event::Messages;
 use crossterm::input::{InputEvent, KeyEvent};
 use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout, Rect};
+use tui::style::{Color, Style};
 use tui::widgets::{Block, Borders, Paragraph, Text, Widget};
 use tui::Frame;
 
@@ -25,7 +26,7 @@ impl<'a> AppWidget<'a> {
         };
     }
 
-    pub fn propagate(state: &App, event: Messages, tx: mpsc::Sender<Messages>) -> bool {
+    pub fn propagate(state: &App, event: Messages, tx: mpsc::Sender<Messages>) -> Option<Messages> {
         // Propagation
         match state.route {
             AppRoute::Home => HomeWidget::propagate(state, event, tx),
@@ -49,16 +50,20 @@ impl<'a> HomeWidget<'a> {
             .render(frame, content);
     }
 
-    pub fn propagate(_state: &App, event: Messages, tx: mpsc::Sender<Messages>) -> bool {
+    pub fn propagate(
+        _state: &App,
+        event: Messages,
+        tx: mpsc::Sender<Messages>,
+    ) -> Option<Messages> {
         match event {
             Messages::Input(InputEvent::Keyboard(KeyEvent::Enter)) => {
                 tx.send(Messages::ChangeRoute(AppRoute::DoExam(
                     DoExamDisplay::default(),
                 )))
                 .unwrap();
-                false
+                None
             }
-            _ => true,
+            _ => Some(event),
         }
     }
 }
@@ -77,16 +82,16 @@ impl<'a> ExamWidget<'a> {
             .direction(Direction::Horizontal)
             .margin(1)
             // Main View and Sidebar
-            .constraints([Constraint::Min(30), Constraint::Max(16)].as_ref())
+            .constraints([Constraint::Min(30), Constraint::Length(18)].as_ref())
             .split(content);
 
         ItemWidget::new(self.app).draw(frame, main_chunks[0]);
-        Paragraph::new([Text::raw("Answer")].iter()).render(frame, main_chunks[1]);
+        ExamItemsWidget::new(self.app).draw(frame, main_chunks[1]);
     }
 
-    pub fn propagate(state: &App, event: Messages, tx: mpsc::Sender<Messages>) -> bool {
-        ItemWidget::propagate(state, event, tx);
-        false
+    pub fn propagate(state: &App, event: Messages, tx: mpsc::Sender<Messages>) -> Option<Messages> {
+        ExamItemsWidget::propagate(state, event, tx.clone())
+            .and_then(|event| ItemWidget::propagate(state, event, tx))
     }
 }
 
@@ -119,19 +124,17 @@ impl<'a> ItemWidget<'a> {
         }
     }
 
-    pub fn propagate(state: &App, event: Messages, tx: mpsc::Sender<Messages>) -> bool {
-        if let AppRoute::DoExam(display) = &state.route {
-            if let Some(item) = &state.exam.question_at(display.question_index) {
-                match item {
-                    Item::Question(_) => {
-                        QuestionWidget::propagate(state, event, tx);
-                        return false;
-                    }
-                    _ => {}
-                }
-            }
-        };
-        true
+    pub fn propagate(state: &App, event: Messages, tx: mpsc::Sender<Messages>) -> Option<Messages> {
+        match &state.route {
+            AppRoute::DoExam(display) => match &state.exam.question_at(display.question_index) {
+                Some(item) => match item {
+                    Item::Question(_) => QuestionWidget::propagate(state, event, tx),
+                    _ => Some(event),
+                },
+                _ => Some(event),
+            },
+            _ => Some(event),
+        }
     }
 }
 
@@ -180,7 +183,7 @@ impl<'a> QuestionWidget<'a> {
                     let selection_flag: u8 = 0b1 << index;
                     ToggleButtonState {
                         text: &sel.text,
-                        selected: (selection_flag & self.question.user_selection.bits()) != 0,
+                        selected: self.question.user_selection.is_selected(selection_flag),
                     }
                 })
                 .collect();
@@ -188,52 +191,110 @@ impl<'a> QuestionWidget<'a> {
         };
     }
 
-    pub fn propagate(_state: &App, event: Messages, tx: mpsc::Sender<Messages>) -> bool {
+    pub fn propagate(
+        _state: &App,
+        event: Messages,
+        tx: mpsc::Sender<Messages>,
+    ) -> Option<Messages> {
         match event {
             Messages::Input(InputEvent::Keyboard(key)) => match key {
                 KeyEvent::Char('a') | KeyEvent::Char('A') => {
                     tx.send(Messages::ToggleSelection(SelectionFlags::A))
                         .unwrap();
-                    false
+                    None
                 }
                 KeyEvent::Char('b') | KeyEvent::Char('B') => {
                     tx.send(Messages::ToggleSelection(SelectionFlags::B))
                         .unwrap();
-                    false
+                    None
                 }
                 KeyEvent::Char('c') | KeyEvent::Char('C') => {
                     tx.send(Messages::ToggleSelection(SelectionFlags::C))
                         .unwrap();
-                    false
+                    None
                 }
                 KeyEvent::Char('d') | KeyEvent::Char('D') => {
                     tx.send(Messages::ToggleSelection(SelectionFlags::D))
                         .unwrap();
-                    false
+                    None
                 }
                 KeyEvent::Char('e') | KeyEvent::Char('E') => {
                     tx.send(Messages::ToggleSelection(SelectionFlags::E))
                         .unwrap();
-                    false
+                    None
                 }
                 KeyEvent::Char('f') | KeyEvent::Char('F') => {
                     tx.send(Messages::ToggleSelection(SelectionFlags::F))
                         .unwrap();
-                    false
+                    None
                 }
                 KeyEvent::Char('g') | KeyEvent::Char('G') => {
                     tx.send(Messages::ToggleSelection(SelectionFlags::G))
                         .unwrap();
-                    false
+                    None
                 }
                 KeyEvent::Char('h') | KeyEvent::Char('H') => {
                     tx.send(Messages::ToggleSelection(SelectionFlags::H))
                         .unwrap();
-                    false
+                    None
                 }
-                _ => true,
+                _ => Some(event),
             },
-            _ => true,
+            _ => Some(event),
         }
+    }
+}
+
+pub struct ExamItemsWidget<'a> {
+    app: &'a App,
+}
+
+impl<'a> ExamItemsWidget<'a> {
+    pub fn new(app: &'a App) -> Self {
+        ExamItemsWidget { app }
+    }
+
+    pub fn draw<B: Backend>(&mut self, frame: &mut Frame<B>, content: Rect) {
+        let mut texts: Vec<Text> = vec![];
+
+        self.app
+            .exam
+            .questions
+            .iter()
+            .enumerate()
+            .for_each(|(index, item)| {
+                match item {
+                    Item::Question(question) => {
+                        let style = match question.get_result() {
+                            ExamResult::Correct => {
+                                Style::default().fg(Color::White).bg(Color::Green)
+                            }
+                            ExamResult::Wrong => Style::default().fg(Color::White).bg(Color::Red),
+                            ExamResult::Pending => Style::default().bg(Color::Gray),
+                            _ => Style::default(),
+                        };
+                        texts.push(Text::styled(format!("{:3}", &index), style));
+                    }
+                    Item::Card(_) => {
+                        texts.push(Text::raw(format!("{:3}", &index)));
+                    }
+                };
+                if index % 4 == 3 {
+                    texts.push(Text::raw(" \n"));
+                } else {
+                    texts.push(Text::raw(" "));
+                }
+            });
+        Paragraph::new(texts.iter())
+            .block(Block::default().borders(Borders::ALL))
+            .render(frame, content);
+    }
+
+    pub fn propagate(
+        _state: &App,
+        event: Messages,
+        tx: mpsc::Sender<Messages>,
+    ) -> Option<Messages> {
+        Some(event)
     }
 }

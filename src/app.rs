@@ -4,6 +4,7 @@ pub struct Selection {
 }
 
 bitflags! {
+    #[derive(Default)]
     pub struct SelectionFlags: u8 {
         const A = 0b00000001;
         const B = 0b00000010;
@@ -17,10 +18,14 @@ bitflags! {
     }
 }
 
-impl Default for SelectionFlags {
-    fn default() -> Self {
-        SelectionFlags::NONE
+impl SelectionFlags {
+    pub fn is_selected(&self, index: u8) -> bool {
+        self.bits() & index != 0
     }
+}
+
+pub trait HasExamResult {
+    fn get_result(&self) -> ExamResult;
 }
 
 pub struct Question {
@@ -28,6 +33,35 @@ pub struct Question {
     pub selections: Vec<Selection>,
     pub answer: Option<String>,
     pub user_selection: SelectionFlags,
+}
+
+impl Question {
+    pub fn get_should_selects(&self) -> SelectionFlags {
+        let mut result = SelectionFlags::NONE;
+        self.selections
+            .iter()
+            .enumerate()
+            .map(|(index, sel)| {
+                SelectionFlags::from_bits(0b1 << index).and_then(|mask| {
+                    result |= mask;
+                    Some(mask)
+                });
+            })
+            .collect::<Vec<()>>();
+        result
+    }
+}
+
+impl HasExamResult for Question {
+    fn get_result(&self) -> ExamResult {
+        match self.user_selection.bits() == 0 {
+            true => ExamResult::Pending,
+            false => match self.get_should_selects() == self.user_selection {
+                true => ExamResult::Correct,
+                false => ExamResult::Wrong,
+            },
+        }
+    }
 }
 
 pub struct Card {
@@ -41,7 +75,7 @@ pub enum Item {
 }
 
 pub struct Exam {
-    questions: Vec<Item>,
+    pub questions: Vec<Item>,
 }
 
 pub enum ExamResult {
@@ -108,21 +142,38 @@ impl Question {
 pub fn get_sample_app() -> App {
     App {
         exam: Exam {
-            questions: vec![Item::Question(Question {
-                question: "Game Over. Continue?".to_owned(),
-                selections: vec![
-                    Selection {
-                        text: "No".to_owned(),
-                        should_select: false,
-                    },
-                    Selection {
-                        text: "Yes".to_owned(),
-                        should_select: true,
-                    },
-                ],
-                answer: Some("You should select yes".to_owned()),
-                user_selection: Default::default(),
-            })],
+            questions: vec![
+                Item::Question(Question {
+                    question: "Game Over. Continue?".to_owned(),
+                    selections: vec![
+                        Selection {
+                            text: "No".to_owned(),
+                            should_select: false,
+                        },
+                        Selection {
+                            text: "Yes".to_owned(),
+                            should_select: true,
+                        },
+                    ],
+                    answer: Some("You should select yes".to_owned()),
+                    user_selection: Default::default(),
+                }),
+                Item::Question(Question {
+                    question: "Select your gender".to_owned(),
+                    selections: vec![
+                        Selection {
+                            text: "Male".to_owned(),
+                            should_select: false,
+                        },
+                        Selection {
+                            text: "Female".to_owned(),
+                            should_select: false,
+                        },
+                    ],
+                    answer: None,
+                    user_selection: Default::default(),
+                }),
+            ],
         },
         route: AppRoute::Home,
     }
