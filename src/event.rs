@@ -18,6 +18,8 @@ pub enum UpdateQuestionIndexEvent {
 pub enum UpdateHomeSelectedEvent {
     Next,
     Prev,
+    Home,
+    End,
 }
 
 #[derive(Debug)]

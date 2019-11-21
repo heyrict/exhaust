@@ -132,6 +132,8 @@ pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> O
                             max_index
                         }
                     }
+                    UpdateHomeSelectedEvent::Home => 0,
+                    UpdateHomeSelectedEvent::End => max_index,
                 };
                 state.home.current_selected = Some(next_index);
                 None

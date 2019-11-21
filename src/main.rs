@@ -31,7 +31,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut terminal = Terminal::new(backend)?;
     terminal.hide_cursor()?;
 
-    let mut app = get_sample_app();
+    let mut app = App::default();
 
     terminal.clear()?;
 

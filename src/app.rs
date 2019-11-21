@@ -136,12 +136,42 @@ pub enum AppRoute {
     DoExam(DoExamDisplay),
 }
 
+impl Default for AppRoute {
+    fn default() -> Self {
+        AppRoute::Home
+    }
+}
+
+pub enum OpenMode {
+    ReadOnly,
+    Write,
+}
+
+impl Default for OpenMode {
+    fn default() -> Self {
+        Self::ReadOnly
+    }
+}
+
 pub struct Home {
     pub exam_src: Option<PathBuf>,
     pub current_path: PathBuf,
     pub current_selected: Option<usize>,
+    pub open_mode: OpenMode,
 }
 
+impl Default for Home {
+    fn default() -> Self {
+        Home {
+            exam_src: None,
+            current_path: current_dir().expect("Unable to get current directory"),
+            current_selected: None,
+            open_mode: OpenMode::default(),
+        }
+    }
+}
+
+#[derive(Default)]
 pub struct App {
     pub route: AppRoute,
     pub exam: Option<Exam>,
@@ -177,18 +207,6 @@ impl Question {
 
     pub fn has_selection(&self, selection: SelectionFlags) -> bool {
         selection.bits() >> self.selections.len() == 0
-    }
-}
-
-pub fn get_sample_app() -> App {
-    App {
-        home: Home {
-            current_path: current_dir().expect("Unable to get current directory"),
-            exam_src: None,
-            current_selected: None,
-        },
-        exam: None,
-        route: AppRoute::Home,
     }
 }
 

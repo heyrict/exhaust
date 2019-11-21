@@ -63,11 +63,18 @@ impl<'a> HomeWidget<'a> {
             .items(
                 &paths
                     .iter()
-                    .map(|path| path.to_str().unwrap_or("???"))
-                    .collect::<Vec<&str>>(),
+                    .map(|path| {
+                        let path_str = path.to_str().unwrap_or("???");
+                        match path.is_dir() {
+                            true => format!("{}/", path_str),
+                            false => path_str.to_owned(),
+                        }
+                    })
+                    .collect::<Vec<String>>(),
             )
             .select(self.app.home.current_selected)
             .highlight_symbol(">")
+            .highlight_style(Style::default().modifier(Modifier::REVERSED))
             .render(frame, chunks[1]);
     }
 
@@ -89,6 +96,16 @@ impl<'a> HomeWidget<'a> {
                 }
                 KeyEvent::Char('k') => {
                     tx.send(Messages::UpdateHomeSelected(UpdateHomeSelectedEvent::Prev))
+                        .unwrap();
+                    None
+                }
+                KeyEvent::Char('g') => {
+                    tx.send(Messages::UpdateHomeSelected(UpdateHomeSelectedEvent::Home))
+                        .unwrap();
+                    None
+                }
+                KeyEvent::Char('G') => {
+                    tx.send(Messages::UpdateHomeSelected(UpdateHomeSelectedEvent::End))
                         .unwrap();
                     None
                 }
