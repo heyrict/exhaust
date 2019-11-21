@@ -5,9 +5,18 @@ use std::thread;
 
 use crossterm::input::{input, InputEvent};
 
+#[derive(Debug)]
+pub enum UpdateQuestionIndexEvent {
+    Next,
+    Prev,
+    Set(usize),
+}
+
+#[derive(Debug)]
 pub enum Messages {
     Input(InputEvent),
     ChangeRoute(AppRoute),
+    UpdateQuestionIndex(UpdateQuestionIndexEvent),
     ToggleSelection(SelectionFlags),
     Quit,
 }

@@ -1,5 +1,5 @@
 use crate::app::*;
-use crate::event::Messages;
+use crate::event::*;
 
 pub fn reduce(state: &mut App, event: Messages) -> Option<Messages> {
     // Route handler
@@ -26,6 +26,41 @@ pub fn reduce(state: &mut App, event: Messages) -> Option<Messages> {
             };
             Some(event)
         }
+        Messages::UpdateQuestionIndex(evt) => match &state.route {
+            AppRoute::DoExam(display) => {
+                let max_index = state.exam.num_questions() - 1;
+                let next_index = match &evt {
+                    UpdateQuestionIndexEvent::Next => {
+                        if display.question_index < max_index {
+                            display.question_index + 1
+                        } else {
+                            max_index
+                        }
+                    }
+                    UpdateQuestionIndexEvent::Prev => {
+                        if display.question_index > 0 {
+                            display.question_index - 1
+                        } else {
+                            0
+                        }
+                    }
+                    UpdateQuestionIndexEvent::Set(index) => {
+                        if *index > max_index {
+                            max_index
+                        } else {
+                            *index
+                        }
+                    }
+                };
+                let new_display = DoExamDisplay {
+                    question_index: next_index,
+                    ..display.clone()
+                };
+                state.route = AppRoute::DoExam(new_display);
+                None
+            }
+            _ => None,
+        },
         _ => Some(event),
     }
 }

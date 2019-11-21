@@ -24,8 +24,8 @@ impl SelectionFlags {
     }
 }
 
-pub trait HasExamResult {
-    fn get_result(&self) -> ExamResult;
+pub trait HasQuestionResult {
+    fn get_result(&self) -> QuestionResult;
 }
 
 pub struct Question {
@@ -41,24 +41,23 @@ impl Question {
         self.selections
             .iter()
             .enumerate()
-            .map(|(index, sel)| {
+            .for_each(|(index, _sel)| {
                 SelectionFlags::from_bits(0b1 << index).and_then(|mask| {
                     result |= mask;
                     Some(mask)
                 });
-            })
-            .collect::<Vec<()>>();
+            });
         result
     }
 }
 
-impl HasExamResult for Question {
-    fn get_result(&self) -> ExamResult {
+impl HasQuestionResult for Question {
+    fn get_result(&self) -> QuestionResult {
         match self.user_selection.bits() == 0 {
-            true => ExamResult::Pending,
+            true => QuestionResult::Pending,
             false => match self.get_should_selects() == self.user_selection {
-                true => ExamResult::Correct,
-                false => ExamResult::Wrong,
+                true => QuestionResult::Correct,
+                false => QuestionResult::Wrong,
             },
         }
     }
@@ -76,19 +75,27 @@ pub enum Item {
 
 pub struct Exam {
     pub questions: Vec<Item>,
+    pub result: ExamResult,
 }
 
-pub enum ExamResult {
+#[derive(Clone, Debug)]
+pub enum QuestionResult {
     Pending,
     Correct,
     Wrong,
     Done,
 }
 
+#[derive(Clone, Debug)]
+pub enum ExamResult {
+    Pending,
+    Done,
+}
+
+#[derive(Clone, Debug)]
 pub struct DoExamDisplay {
     pub question_index: usize,
     pub display_answer: bool,
-    pub result: ExamResult,
 }
 
 impl Default for DoExamDisplay {
@@ -96,11 +103,17 @@ impl Default for DoExamDisplay {
         DoExamDisplay {
             question_index: 0,
             display_answer: false,
-            result: ExamResult::Pending,
         }
     }
 }
 
+impl DoExamDisplay {
+    pub fn set_index(&mut self, index: usize) {
+        self.question_index = index;
+    }
+}
+
+#[derive(Debug)]
 pub enum AppRoute {
     Home,
     DoExam(DoExamDisplay),
@@ -174,6 +187,7 @@ pub fn get_sample_app() -> App {
                     user_selection: Default::default(),
                 }),
             ],
+            result: ExamResult::Pending,
         },
         route: AppRoute::Home,
     }
