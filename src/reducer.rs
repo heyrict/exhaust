@@ -1,10 +1,13 @@
 use crate::app::*;
 use crate::event::*;
+use std::fs::read_dir;
 use std::fs::File;
-use std::io::Write;
+use std::io::{Read, Write};
+use std::path::PathBuf;
+use std::sync::mpsc;
 use std::thread;
 
-pub fn reduce(state: &mut App, event: Messages) -> Option<Messages> {
+pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> Option<Messages> {
     // Route handler
     match event {
         Messages::ChangeRoute(route) => {
@@ -32,6 +35,7 @@ pub fn reduce(state: &mut App, event: Messages) -> Option<Messages> {
                 };
 
                 // Save data on selection change
+                // TODO: Move save to a separate event;
                 match &event {
                     Messages::ToggleSelection(_) => {
                         let exam_copy = state.exam.clone();
@@ -93,6 +97,77 @@ pub fn reduce(state: &mut App, event: Messages) -> Option<Messages> {
                 ExamResult::Done => ExamResult::Pending,
                 ExamResult::Pending => ExamResult::Done,
             };
+            None
+        }
+        Messages::UpdateHomeSelected(evt) => match &state.route {
+            AppRoute::Home => {
+                let paths: Vec<PathBuf> = read_dir(&state.home.current_path)
+                    .unwrap()
+                    .map(|path| path.unwrap().path())
+                    .collect();
+                let max_index = if paths.len() > 0 {
+                    paths.len() - 1
+                } else {
+                    return None;
+                };
+                let current_selected = match state.home.current_selected {
+                    Some(k) => k,
+                    None => {
+                        state.home.current_selected = Some(0);
+                        return None;
+                    }
+                };
+                let next_index = match &evt {
+                    UpdateHomeSelectedEvent::Next => {
+                        if current_selected < max_index {
+                            current_selected + 1
+                        } else {
+                            0
+                        }
+                    }
+                    UpdateHomeSelectedEvent::Prev => {
+                        if current_selected > 0 {
+                            current_selected - 1
+                        } else {
+                            max_index
+                        }
+                    }
+                };
+                state.home.current_selected = Some(next_index);
+                None
+            }
+            _ => None,
+        },
+        Messages::LoadFile => {
+            let paths: Vec<PathBuf> = read_dir(&state.home.current_path)
+                .unwrap()
+                .map(|path| path.unwrap().path())
+                .collect();
+            let selected_index = match &state.home.current_selected {
+                Some(i) => i,
+                None => return None,
+            };
+            let filename = paths.get(*selected_index).expect("Index out of range");
+            let mut file = File::open(filename).expect("Unable to open file");
+            let tx = tx.clone();
+
+            thread::spawn(move || {
+                let mut contents = String::new();
+                file.read_to_string(&mut contents)
+                    .expect("Unable to read file");
+                let exam: Exam =
+                    serde_json::from_str(&contents).expect("Unable to convert file to string");
+                tx.send(Messages::FileLoaded(exam)).unwrap();
+                tx.send(Messages::ChangeRoute(AppRoute::DoExam(
+                    DoExamDisplay::default(),
+                )))
+                .unwrap();
+            });
+
+            None
+        }
+        Messages::FileLoaded(exam) => {
+            state.exam = Some(exam);
             None
         }
         _ => Some(event),

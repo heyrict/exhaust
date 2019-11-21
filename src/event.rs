@@ -1,4 +1,6 @@
+use crate::app::Exam;
 use crate::app::{AppRoute, SelectionFlags};
+use std::path::PathBuf;
 
 use std::sync::mpsc;
 use std::thread;
@@ -13,11 +15,20 @@ pub enum UpdateQuestionIndexEvent {
 }
 
 #[derive(Debug)]
+pub enum UpdateHomeSelectedEvent {
+    Next,
+    Prev,
+}
+
+#[derive(Debug)]
 pub enum Messages {
     Input(InputEvent),
     ChangeRoute(AppRoute),
     UpdateQuestionIndex(UpdateQuestionIndexEvent),
+    UpdateHomeSelected(UpdateHomeSelectedEvent),
     ToggleSelection(SelectionFlags),
+    LoadFile,
+    FileLoaded(Exam),
     ToggleExamResult,
     Quit,
 }

@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
+use std::env::current_dir;
+use std::path::PathBuf;
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Selection {
     pub text: String,
     pub should_select: bool,
@@ -31,7 +33,7 @@ pub trait HasQuestionResult {
     fn get_result(&self) -> QuestionResult;
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Question {
     pub question: String,
     pub selections: Vec<Selection>,
@@ -68,19 +70,19 @@ impl HasQuestionResult for Question {
     }
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Card {
     question: String,
     answer: String,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Item {
     Question(Question),
     Card(Card),
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Exam {
     pub questions: Vec<Item>,
     #[serde(default)]
@@ -134,9 +136,16 @@ pub enum AppRoute {
     DoExam(DoExamDisplay),
 }
 
+pub struct Home {
+    pub exam_src: Option<PathBuf>,
+    pub current_path: PathBuf,
+    pub current_selected: Option<usize>,
+}
+
 pub struct App {
-    pub exam: Option<Exam>,
     pub route: AppRoute,
+    pub exam: Option<Exam>,
+    pub home: Home,
 }
 
 impl Exam {
@@ -173,41 +182,12 @@ impl Question {
 
 pub fn get_sample_app() -> App {
     App {
-        exam: Some(Exam {
-            questions: vec![
-                Item::Question(Question {
-                    question: "Game Over. Continue?".to_owned(),
-                    selections: vec![
-                        Selection {
-                            text: "No".to_owned(),
-                            should_select: false,
-                        },
-                        Selection {
-                            text: "Yes".to_owned(),
-                            should_select: true,
-                        },
-                    ],
-                    answer: Some("You should select yes".to_owned()),
-                    user_selection: Default::default(),
-                }),
-                Item::Question(Question {
-                    question: "Select your gender".to_owned(),
-                    selections: vec![
-                        Selection {
-                            text: "Male".to_owned(),
-                            should_select: false,
-                        },
-                        Selection {
-                            text: "Female".to_owned(),
-                            should_select: false,
-                        },
-                    ],
-                    answer: None,
-                    user_selection: Default::default(),
-                }),
-            ],
-            result: ExamResult::Pending,
-        }),
+        home: Home {
+            current_path: current_dir().expect("Unable to get current directory"),
+            exam_src: None,
+            current_selected: None,
+        },
+        exam: None,
         route: AppRoute::Home,
     }
 }

@@ -1,13 +1,15 @@
 use crossterm::input::{InputEvent, KeyEvent};
+use std::fs::read_dir;
+use std::path::PathBuf;
 use std::sync::mpsc;
 use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
-use tui::widgets::{Block, Borders, Paragraph, Text, Widget};
+use tui::widgets::{Block, Borders, Paragraph, SelectableList, Text, Widget};
 use tui::Frame;
 
 use crate::app::*;
-use crate::event::{Messages, UpdateQuestionIndexEvent};
+use crate::event::*;
 use crate::toggle_buttons::*;
 
 pub struct AppWidget<'a> {
@@ -45,9 +47,28 @@ impl<'a> HomeWidget<'a> {
     }
 
     pub fn draw<B: Backend>(&mut self, frame: &mut Frame<B>, content: Rect) {
-        let _test = Paragraph::new([Text::raw("Welcome!\n\nPress Enter to Start")].iter())
+        let paths: Vec<PathBuf> = read_dir(&self.app.home.current_path)
+            .unwrap()
+            .map(|path| path.unwrap().path())
+            .collect();
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(3), Constraint::Min(6)].as_ref())
+            .margin(1)
+            .split(content);
+        let _welcome = Paragraph::new([Text::raw("Welcome! Choose a file to start:")].iter())
             .block(Block::default().borders(Borders::ALL))
-            .render(frame, content);
+            .render(frame, chunks[0]);
+        let _items = SelectableList::default()
+            .items(
+                &paths
+                    .iter()
+                    .map(|path| path.to_str().unwrap_or("???"))
+                    .collect::<Vec<&str>>(),
+            )
+            .select(self.app.home.current_selected)
+            .highlight_symbol(">")
+            .render(frame, chunks[1]);
     }
 
     pub fn propagate(
@@ -56,13 +77,23 @@ impl<'a> HomeWidget<'a> {
         tx: mpsc::Sender<Messages>,
     ) -> Option<Messages> {
         match event {
-            Messages::Input(InputEvent::Keyboard(KeyEvent::Enter)) => {
-                tx.send(Messages::ChangeRoute(AppRoute::DoExam(
-                    DoExamDisplay::default(),
-                )))
-                .unwrap();
-                None
-            }
+            Messages::Input(InputEvent::Keyboard(key)) => match key {
+                KeyEvent::Enter => {
+                    tx.send(Messages::LoadFile).unwrap();
+                    None
+                }
+                KeyEvent::Char('j') => {
+                    tx.send(Messages::UpdateHomeSelected(UpdateHomeSelectedEvent::Next))
+                        .unwrap();
+                    None
+                }
+                KeyEvent::Char('k') => {
+                    tx.send(Messages::UpdateHomeSelected(UpdateHomeSelectedEvent::Prev))
+                        .unwrap();
+                    None
+                }
+                _ => Some(event),
+            },
             _ => Some(event),
         }
     }

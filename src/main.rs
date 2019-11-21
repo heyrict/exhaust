@@ -57,7 +57,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             Messages::Input(InputEvent::Keyboard(KeyEvent::Char('Q'))) => break,
             Messages::Quit => break,
             _ => {
-                reducer::reduce(&mut app, next_event)
+                reducer::reduce(&mut app, next_event, events.tx.clone())
                     .map(|evt: Messages| ui::AppWidget::propagate(&app, evt, events.tx.clone()));
             }
         }
