@@ -1,3 +1,6 @@
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize, Serialize)]
 pub struct Selection {
     pub text: String,
     pub should_select: bool,
@@ -28,10 +31,12 @@ pub trait HasQuestionResult {
     fn get_result(&self) -> QuestionResult;
 }
 
+#[derive(Deserialize, Serialize)]
 pub struct Question {
     pub question: String,
     pub selections: Vec<Selection>,
     pub answer: Option<String>,
+    #[serde(default, with = "selection_flags_serde")]
     pub user_selection: SelectionFlags,
 }
 
@@ -63,18 +68,22 @@ impl HasQuestionResult for Question {
     }
 }
 
+#[derive(Deserialize, Serialize)]
 pub struct Card {
     question: String,
     answer: String,
 }
 
+#[derive(Serialize, Deserialize)]
 pub enum Item {
     Question(Question),
     Card(Card),
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Exam {
     pub questions: Vec<Item>,
+    #[serde(default)]
     pub result: ExamResult,
 }
 
@@ -86,10 +95,16 @@ pub enum QuestionResult {
     Done,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum ExamResult {
     Pending,
     Done,
+}
+
+impl Default for ExamResult {
+    fn default() -> Self {
+        ExamResult::Pending
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -194,5 +209,27 @@ pub fn get_sample_app() -> App {
             result: ExamResult::Pending,
         }),
         route: AppRoute::Home,
+    }
+}
+
+mod selection_flags_serde {
+    use super::SelectionFlags;
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S>(data: &SelectionFlags, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_u8(data.bits())
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<SelectionFlags, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let bits = u8::deserialize(deserializer)?;
+        SelectionFlags::from_bits(bits).ok_or(serde::de::Error::custom(
+            "Error deserializing selection flags",
+        ))
     }
 }

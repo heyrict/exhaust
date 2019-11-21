@@ -1,7 +1,17 @@
 use crate::app::*;
 use crate::event::*;
+use std::fs::File;
+use std::io::Write;
 
 pub fn reduce(state: &mut App, event: Messages) -> Option<Messages> {
+    let mut file = File::create("/tmp/temp.json").expect("Error opening /tmp/temp.json");
+    file.write_all(
+        serde_json::to_string(&state.exam)
+            .expect("Error converting exam to json")
+            .as_ref(),
+    )
+    .expect("Error writing /tmp/temp.json");
+
     // Route handler
     match event {
         Messages::ChangeRoute(route) => {

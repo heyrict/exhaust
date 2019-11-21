@@ -116,6 +116,7 @@ impl<'a> ItemWidget<'a> {
                 let item: &Item = self
                     .app
                     .exam
+                    .as_ref()
                     .unwrap()
                     .question_at(display.question_index)
                     .expect("Item out of range!");
@@ -134,7 +135,12 @@ impl<'a> ItemWidget<'a> {
     pub fn propagate(state: &App, event: Messages, tx: mpsc::Sender<Messages>) -> Option<Messages> {
         match &state.route {
             AppRoute::DoExam(display) => {
-                match &state.exam.unwrap().question_at(display.question_index) {
+                match &state
+                    .exam
+                    .as_ref()
+                    .unwrap()
+                    .question_at(display.question_index)
+                {
                     Some(item) => match item {
                         Item::Question(_) => QuestionWidget::propagate(state, event, tx),
                         _ => Some(event),
@@ -173,7 +179,7 @@ impl<'a> QuestionWidget<'a> {
             let question_title = format!(
                 "Question ({}/{})",
                 &self.display.question_index + 1,
-                &self.app.exam.unwrap().num_questions()
+                &self.app.exam.as_ref().unwrap().num_questions()
             );
             let _question = Paragraph::new([Text::raw(&self.question.question)].iter())
                 .block(
@@ -297,9 +303,9 @@ impl<'a> ExamItemsWidget<'a> {
             modifier: Modifier::empty(),
         };
 
-        let qitems = self.app.exam.unwrap().questions.iter().enumerate();
+        let qitems = self.app.exam.as_ref().unwrap().questions.iter().enumerate();
 
-        match self.app.exam.unwrap().result {
+        match self.app.exam.as_ref().unwrap().result {
             ExamResult::Pending => qitems.for_each(|(index, item)| {
                 // Text
                 if index == current_index {
