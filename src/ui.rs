@@ -47,16 +47,42 @@ impl<'a> HomeWidget<'a> {
     }
 
     pub fn draw<B: Backend>(&mut self, frame: &mut Frame<B>, content: Rect) {
+        const UNDERLINE_STYLE: Style = Style {
+            fg: Color::Reset,
+            bg: Color::Reset,
+            modifier: Modifier::UNDERLINED,
+        };
+        const HIGHLIGHT_STYLE: Style = Style {
+            fg: Color::Reset,
+            bg: Color::Reset,
+            modifier: Modifier::REVERSED,
+        };
+
+        let messages: [Text; 7] = [
+            Text::raw("Welcome! Choose a file to start:\n\n["),
+            Text::styled("u", UNDERLINE_STYLE),
+            Text::raw(": Upper directory] | ["),
+            match self.app.home.open_mode {
+                OpenMode::ReadOnly => Text::styled("ReadOnly", HIGHLIGHT_STYLE),
+                OpenMode::Write => Text::styled("ReadOnly", Style::default()),
+            },
+            Text::raw("|"),
+            match self.app.home.open_mode {
+                OpenMode::ReadOnly => Text::styled("Write", Style::default()),
+                OpenMode::Write => Text::styled("Write", HIGHLIGHT_STYLE),
+            },
+            Text::raw("]"),
+        ];
         let paths: Vec<PathBuf> = read_dir(&self.app.home.current_path)
             .unwrap()
             .map(|path| path.unwrap().path())
             .collect();
         let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(3), Constraint::Min(6)].as_ref())
+            .constraints([Constraint::Length(5), Constraint::Min(6)].as_ref())
             .margin(1)
             .split(content);
-        let _welcome = Paragraph::new([Text::raw("Welcome! Choose a file to start:")].iter())
+        let _welcome = Paragraph::new(messages.iter())
             .block(Block::default().borders(Borders::ALL))
             .render(frame, chunks[0]);
         let _items = SelectableList::default()
@@ -107,6 +133,18 @@ impl<'a> HomeWidget<'a> {
                 KeyEvent::Char('G') => {
                     tx.send(Messages::UpdateHomeSelected(UpdateHomeSelectedEvent::End))
                         .unwrap();
+                    None
+                }
+                KeyEvent::Char('u') => {
+                    tx.send(Messages::LoadUpperDirectory).unwrap();
+                    None
+                }
+                KeyEvent::Char('r') => {
+                    tx.send(Messages::SetOpenMode(OpenMode::ReadOnly)).unwrap();
+                    None
+                }
+                KeyEvent::Char('w') => {
+                    tx.send(Messages::SetOpenMode(OpenMode::Write)).unwrap();
                     None
                 }
                 _ => Some(event),

@@ -1,6 +1,5 @@
 use crate::app::Exam;
-use crate::app::{AppRoute, SelectionFlags};
-use std::path::PathBuf;
+use crate::app::{AppRoute, OpenMode, SelectionFlags};
 
 use std::sync::mpsc;
 use std::thread;
@@ -30,7 +29,9 @@ pub enum Messages {
     UpdateHomeSelected(UpdateHomeSelectedEvent),
     ToggleSelection(SelectionFlags),
     LoadFile,
+    LoadUpperDirectory,
     FileLoaded(Exam),
+    SetOpenMode(OpenMode),
     ToggleExamResult,
     Quit,
 }

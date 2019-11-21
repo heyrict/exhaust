@@ -142,6 +142,7 @@ impl Default for AppRoute {
     }
 }
 
+#[derive(Debug)]
 pub enum OpenMode {
     ReadOnly,
     Write,

@@ -36,22 +36,24 @@ pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> O
 
                 // Save data on selection change
                 // TODO: Move save to a separate event;
-                match &event {
-                    Messages::ToggleSelection(_) => {
-                        let exam_copy = state.exam.clone();
-                        thread::spawn(move || {
-                            let mut file = File::create("/tmp/temp.json")
-                                .expect("Error opening /tmp/temp.json");
-                            file.write_all(
-                                serde_json::to_string(&exam_copy)
-                                    .expect("Error converting exam to json")
-                                    .as_ref(),
-                            )
-                            .expect("Error writing /tmp/temp.json");
-                        });
-                    }
-                    _ => {}
-                };
+                if let OpenMode::Write = &state.home.open_mode {
+                    match &event {
+                        Messages::ToggleSelection(_) => {
+                            let exam_copy = state.exam.clone();
+                            thread::spawn(move || {
+                                let mut file = File::create("/tmp/temp.json")
+                                    .expect("Error opening /tmp/temp.json");
+                                file.write_all(
+                                    serde_json::to_string(&exam_copy)
+                                        .expect("Error converting exam to json")
+                                        .as_ref(),
+                                )
+                                .expect("Error writing /tmp/temp.json");
+                            });
+                        }
+                        _ => {}
+                    };
+                }
 
                 returns
             }
@@ -150,22 +152,44 @@ pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> O
                 None => return None,
             };
             let filename = paths.get(*selected_index).expect("Index out of range");
-            let mut file = File::open(filename).expect("Unable to open file");
-            let tx = tx.clone();
+            match filename.is_dir() {
+                true => {
+                    state.home.current_path = filename.to_path_buf();
+                    state.home.current_selected = None;
+                }
+                false => {
+                    let mut file = File::open(filename).expect("Unable to open file");
+                    let tx = tx.clone();
 
-            thread::spawn(move || {
-                let mut contents = String::new();
-                file.read_to_string(&mut contents)
-                    .expect("Unable to read file");
-                let exam: Exam =
-                    serde_json::from_str(&contents).expect("Unable to convert file to string");
-                tx.send(Messages::FileLoaded(exam)).unwrap();
-                tx.send(Messages::ChangeRoute(AppRoute::DoExam(
-                    DoExamDisplay::default(),
-                )))
-                .unwrap();
-            });
+                    thread::spawn(move || {
+                        let mut contents = String::new();
+                        file.read_to_string(&mut contents)
+                            .expect("Unable to read file");
+                        let exam: Exam = serde_json::from_str(&contents)
+                            .expect("Unable to convert file to string");
+                        tx.send(Messages::FileLoaded(exam)).unwrap();
+                        tx.send(Messages::ChangeRoute(AppRoute::DoExam(
+                            DoExamDisplay::default(),
+                        )))
+                        .unwrap();
+                    });
+                }
+            };
 
+            None
+        }
+        Messages::LoadUpperDirectory => {
+            match state.home.current_path.parent() {
+                Some(parent) => {
+                    state.home.current_path = parent.to_path_buf();
+                    state.home.current_selected = None;
+                }
+                None => {}
+            };
+            None
+        }
+        Messages::SetOpenMode(mode) => {
+            state.home.open_mode = mode;
             None
         }
         Messages::FileLoaded(exam) => {
