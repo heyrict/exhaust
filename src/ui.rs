@@ -58,10 +58,12 @@ impl<'a> HomeWidget<'a> {
             modifier: Modifier::REVERSED,
         };
 
-        let messages: [Text; 7] = [
+        let messages: [Text; 9] = [
             Text::raw("Welcome! Choose a file to start:\n\n["),
+            Text::styled("q", UNDERLINE_STYLE),
+            Text::raw(": Quit] | ["),
             Text::styled("u", UNDERLINE_STYLE),
-            Text::raw(": Upper directory] | ["),
+            Text::raw(": Upper] | ["),
             match self.app.home.open_mode {
                 OpenMode::ReadOnly => Text::styled("ReadOnly", HIGHLIGHT_STYLE),
                 OpenMode::Write => Text::styled("ReadOnly", Style::default()),
@@ -147,6 +149,10 @@ impl<'a> HomeWidget<'a> {
                     tx.send(Messages::SetOpenMode(OpenMode::Write)).unwrap();
                     None
                 }
+                KeyEvent::Char('q') => {
+                    tx.send(Messages::Quit).unwrap();
+                    None
+                }
                 _ => Some(event),
             },
             _ => Some(event),
@@ -177,6 +183,10 @@ impl<'a> ExamWidget<'a> {
 
     pub fn propagate(state: &App, event: Messages, tx: mpsc::Sender<Messages>) -> Option<Messages> {
         match &event {
+            Messages::Input(InputEvent::Keyboard(KeyEvent::Char('q'))) => {
+                tx.send(Messages::ChangeRoute(AppRoute::Home)).unwrap();
+                None
+            }
             Messages::Input(InputEvent::Keyboard(KeyEvent::Char(' '))) => {
                 tx.send(Messages::ToggleExamResult).unwrap();
                 None
