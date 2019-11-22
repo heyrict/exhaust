@@ -3,9 +3,11 @@ on:
   push:
     paths-ignore:
       - "samples/**"
+      - "assets/**"
   pull_request:
     paths-ignore:
       - "samples/**"
+      - "assets/**"
 
 jobs:
   # Run the `rustfmt` code formatter
