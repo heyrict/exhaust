@@ -4,8 +4,8 @@ use tui::style::Style;
 use tui::symbols::line;
 use tui::widgets::{Block, Borders, Paragraph, Text, Widget};
 
-pub struct ToggleButtonState<'a> {
-    pub text: &'a str,
+pub struct ToggleButtonState {
+    pub text: String,
     pub selected: bool,
 }
 
@@ -15,7 +15,7 @@ pub struct ToggleButtons<'a> {
     style: Style,
     selected_style: Style,
     /// ToggleButtons State
-    state: Vec<ToggleButtonState<'a>>,
+    state: Vec<ToggleButtonState>,
     /// Visible borders
     borders: Borders,
     /// Border style
@@ -23,7 +23,7 @@ pub struct ToggleButtons<'a> {
 }
 
 impl<'a> ToggleButtons<'a> {
-    pub fn new(state: Vec<ToggleButtonState<'a>>) -> ToggleButtons<'a> {
+    pub fn new(state: Vec<ToggleButtonState>) -> ToggleButtons<'a> {
         ToggleButtons {
             block: None,
             style: Default::default(),

@@ -265,41 +265,111 @@ impl<'a> QuestionWidget<'a> {
     }
 
     pub fn draw<B: Backend>(&mut self, frame: &mut Frame<B>, content: Rect) {
-        if self.display.display_answer {
-        } else {
-            // Question + Selection + Answer
-            let main_chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Min(10), Constraint::Min(16)].as_ref())
-                .split(content);
-            let question_title = format!(
-                "Question ({}/{})",
-                &self.display.question_index + 1,
-                &self.app.exam.as_ref().unwrap().num_questions()
-            );
-            let _question = Paragraph::new([Text::raw(&self.question.question)].iter())
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .title(&question_title),
-                )
-                .wrap(true)
-                .render(frame, main_chunks[0]);
-            let selections_state = self
-                .question
-                .selections
-                .iter()
-                .enumerate()
-                .map(|(index, sel)| {
-                    let selection_flag: u8 = 0b1 << index;
-                    ToggleButtonState {
-                        text: &sel.text,
-                        selected: self.question.user_selection.is_selected(selection_flag),
-                    }
-                })
-                .collect();
-            let _selections = ToggleButtons::new(selections_state).render(frame, main_chunks[1]);
-        };
+        let question_title = format!(
+            "Question ({}/{})",
+            &self.display.question_index + 1,
+            &self.app.exam.as_ref().unwrap().num_questions()
+        );
+
+        match self.app.exam.as_ref().unwrap().result {
+            ExamResult::Pending => {
+                // Question + Selections
+                let main_chunks = Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints([Constraint::Min(10), Constraint::Length(12)].as_ref())
+                    .split(content);
+
+                // Question
+                Paragraph::new([Text::raw(&self.question.question)].iter())
+                    .block(
+                        Block::default()
+                            .borders(Borders::ALL)
+                            .title(&question_title),
+                    )
+                    .wrap(true)
+                    .render(frame, main_chunks[0]);
+
+                // Selections
+                let selections_state = self
+                    .question
+                    .selections
+                    .iter()
+                    .enumerate()
+                    .map(|(index, sel)| {
+                        let selection_flag: u8 = 0b1 << index;
+                        ToggleButtonState {
+                            text: sel.text.clone(),
+                            selected: self.question.user_selection.is_selected(selection_flag),
+                        }
+                    })
+                    .collect();
+                let _selections =
+                    ToggleButtons::new(selections_state).render(frame, main_chunks[1]);
+            }
+            ExamResult::Done => {
+                // Question + Selection + Answer
+                let main_chunks = Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints(
+                        [
+                            Constraint::Min(10),
+                            Constraint::Length(12),
+                            Constraint::Min(10),
+                        ]
+                        .as_ref(),
+                    )
+                    .split(content);
+
+                // Question
+                let _question = Paragraph::new([Text::raw(&self.question.question)].iter())
+                    .block(
+                        Block::default()
+                            .borders(Borders::ALL)
+                            .title(&question_title),
+                    )
+                    .wrap(true)
+                    .render(frame, main_chunks[0]);
+
+                // Selection
+                let selections_state = self
+                    .question
+                    .selections
+                    .iter()
+                    .enumerate()
+                    .map(|(index, sel)| {
+                        let selection_flag: u8 = 0b1 << index;
+                        let selected = self.question.user_selection.is_selected(selection_flag);
+
+                        ToggleButtonState {
+                            text: format!(
+                                "[{}] {}",
+                                match sel.should_select {
+                                    true => '√',
+                                    false => match selected {
+                                        true => '×',
+                                        false => ' ',
+                                    },
+                                },
+                                &sel.text
+                            ),
+                            selected,
+                        }
+                    })
+                    .collect();
+                let _selections =
+                    ToggleButtons::new(selections_state).render(frame, main_chunks[1]);
+
+                // Answer
+                let answer = match self.question.answer.as_ref() {
+                    Some(answer) => answer,
+                    None => "",
+                };
+                let _answer = Paragraph::new([Text::raw(answer)].iter())
+                    .block(Block::default().borders(Borders::TOP).title("­Answer"))
+                    .wrap(true)
+                    .render(frame, main_chunks[2]);
+            }
+        }
     }
 
     pub fn propagate(
