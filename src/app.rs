@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::env::current_dir;
+use std::fs::read_dir;
 use std::path::PathBuf;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -169,6 +170,18 @@ impl Default for Home {
             current_selected: None,
             open_mode: OpenMode::default(),
         }
+    }
+}
+
+impl Home {
+    pub fn get_selected_file(&self) -> Option<PathBuf> {
+        let paths: Vec<PathBuf> = read_dir(&self.current_path)
+            .ok()?
+            .map(|path| path.unwrap().path())
+            .collect();
+        paths
+            .get(self.current_selected?)
+            .map(|path| path.to_path_buf())
     }
 }
 

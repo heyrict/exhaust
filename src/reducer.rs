@@ -40,15 +40,23 @@ pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> O
                     match &event {
                         Messages::ToggleSelection(_) => {
                             let exam_copy = state.exam.clone();
+                            let maybe_filename = state.home.get_selected_file();
                             thread::spawn(move || {
-                                let mut file = File::create("/tmp/temp.json")
-                                    .expect("Error opening /tmp/temp.json");
-                                file.write_all(
-                                    serde_json::to_string(&exam_copy)
-                                        .expect("Error converting exam to json")
-                                        .as_ref(),
-                                )
-                                .expect("Error writing /tmp/temp.json");
+                                maybe_filename.map(|filename| {
+                                    let mut file = File::create(&filename).expect(&format!(
+                                        "Error opening {}",
+                                        &filename.to_str().unwrap()
+                                    ));
+                                    file.write_all(
+                                        serde_json::to_string(&exam_copy)
+                                            .expect("Error converting exam to json")
+                                            .as_ref(),
+                                    )
+                                    .expect(&format!(
+                                        "Error writing {}",
+                                        &filename.to_str().unwrap()
+                                    ));
+                                });
                             });
                         }
                         _ => {}
@@ -143,15 +151,7 @@ pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> O
             _ => None,
         },
         Messages::LoadFile => {
-            let paths: Vec<PathBuf> = read_dir(&state.home.current_path)
-                .unwrap()
-                .map(|path| path.unwrap().path())
-                .collect();
-            let selected_index = match &state.home.current_selected {
-                Some(i) => i,
-                None => return None,
-            };
-            let filename = paths.get(*selected_index).expect("Index out of range");
+            let filename = state.home.get_selected_file()?;
             match filename.is_dir() {
                 true => {
                     state.home.current_path = filename.to_path_buf();
