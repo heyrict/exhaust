@@ -46,15 +46,14 @@ pub struct Question {
 impl Question {
     pub fn get_should_selects(&self) -> SelectionFlags {
         let mut result = SelectionFlags::NONE;
-        self.selections
-            .iter()
-            .enumerate()
-            .for_each(|(index, _sel)| {
-                SelectionFlags::from_bits(0b1 << index).and_then(|mask| {
+        self.selections.iter().enumerate().for_each(|(index, sel)| {
+            SelectionFlags::from_bits(0b1 << index).and_then(|mask| {
+                if sel.should_select {
                     result |= mask;
-                    Some(mask)
-                });
+                }
+                Some(mask)
             });
+        });
         result
     }
 }
