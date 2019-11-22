@@ -219,7 +219,7 @@ impl Question {
     }
 
     pub fn has_selection(&self, selection: SelectionFlags) -> bool {
-        selection.bits() >> self.selections.len() == 0
+        selection.contains(selection)
     }
 }
 
