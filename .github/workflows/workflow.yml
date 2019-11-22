@@ -19,7 +19,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: stable
+          toolchain: nightly
           components: rustfmt
           override: true
       - run: rustup component add rustfmt
@@ -36,7 +36,7 @@ jobs:
       - uses: actions/checkout@v1
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: nightly
           override: true
       - run: cargo install --force cargo-audit
       - run: cargo generate-lockfile
@@ -53,7 +53,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: stable
+          toolchain: nightly
           override: true
       - uses: actions-rs/cargo@v1
         with:
@@ -79,7 +79,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: stable
+          toolchain: nightly
           override: true
 
       # Run the ignored tests that expect the above setup
@@ -99,7 +99,7 @@ jobs:
           - x86_64-unknown-linux-gnu
           - x86_64-unknown-linux-musl
           - x86_64-apple-darwin
-          - x86_64-pc-windows-gnu
+          - x86_64-pc-windows-msvc
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
@@ -110,9 +110,9 @@ jobs:
           - target: x86_64-apple-darwin
             os: macOS-latest
             name: exhaust-x86_64-apple-darwin.tar.gz
-          - target: x86_64-pc-windows-gnu
+          - target: x86_64-pc-windows-msvc
             os: windows-latest
-            name: exhaust-x86_64-pc-windows-gnu.zip
+            name: exhaust-x86_64-pc-windows-msvc.zip
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v1
@@ -121,7 +121,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: stable
+          toolchain: nightly
           override: true
           target: ${{ matrix.target }}
 
@@ -139,18 +139,17 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: |
           strip target/${{ matrix.target }}/release/exhaust.exe
-          7z a ${{ matrix.name }} target/${{ matrix.target }}/release/exhaust.exe
+          7z a ${{ matrix.name }} target/${{ matrix.target }}/release/exhaust.exe README.md samples assets
 
       - name: Prepare build artifacts [-nix]
         if: matrix.os != 'windows-latest'
         run: |
           strip target/${{ matrix.target }}/release/exhaust
-          tar czvf ${{ matrix.name }} target/${{ matrix.target }}/release/exhaust
+          tar czvf ${{ matrix.name }} target/${{ matrix.target }}/release/exhaust README.md samples assets
 
       - name: Create GitHub release ${{ matrix.target }}
         uses: softprops/action-gh-release@v1
         with:
           files: ${{ matrix.name }}
-          body_path: RELEASE.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
