@@ -532,7 +532,7 @@ impl<'a> ExamItemsWidget<'a> {
         }
 
         Paragraph::new(texts.iter())
-            .block(Block::default().borders(Borders::ALL))
+            .block(Block::default().borders(Borders::ALL).title("Items"))
             .render(frame, content);
     }
 
@@ -542,20 +542,23 @@ impl<'a> ExamItemsWidget<'a> {
         tx: mpsc::Sender<Messages>,
     ) -> Option<Messages> {
         match event {
-            Messages::Input(InputEvent::Keyboard(KeyEvent::Char('>'))) => {
-                tx.send(Messages::UpdateQuestionIndex(
-                    UpdateQuestionIndexEvent::Next,
-                ))
-                .unwrap();
-                None
-            }
-            Messages::Input(InputEvent::Keyboard(KeyEvent::Char('<'))) => {
-                tx.send(Messages::UpdateQuestionIndex(
-                    UpdateQuestionIndexEvent::Prev,
-                ))
-                .unwrap();
-                None
-            }
+            Messages::Input(InputEvent::Keyboard(key)) => match key {
+                KeyEvent::Char('>') | KeyEvent::Char('n') => {
+                    tx.send(Messages::UpdateQuestionIndex(
+                        UpdateQuestionIndexEvent::Next,
+                    ))
+                    .unwrap();
+                    None
+                }
+                KeyEvent::Char('<') | KeyEvent::Char('p') => {
+                    tx.send(Messages::UpdateQuestionIndex(
+                        UpdateQuestionIndexEvent::Prev,
+                    ))
+                    .unwrap();
+                    None
+                }
+                _ => Some(event),
+            },
             _ => Some(event),
         }
     }
