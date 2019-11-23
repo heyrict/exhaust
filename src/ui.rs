@@ -303,6 +303,7 @@ impl<'a> QuestionWidget<'a> {
                     .selections
                     .iter()
                     .enumerate()
+                    .take(8)
                     .map(|(index, sel)| {
                         let selection_flag: u8 = 0b1 << index;
                         ToggleButtonState {
@@ -331,6 +332,7 @@ impl<'a> QuestionWidget<'a> {
                     .selections
                     .iter()
                     .enumerate()
+                    .take(8)
                     .map(|(index, sel)| {
                         let selection_flag: u8 = 0b1 << index;
                         let selected = self.question.user_selection.is_selected(selection_flag);
