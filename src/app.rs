@@ -189,11 +189,22 @@ impl Home {
     }
 }
 
+pub struct Config {
+    pub items_per_line: u16,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Config { items_per_line: 5 }
+    }
+}
+
 #[derive(Default)]
 pub struct App {
     pub route: AppRoute,
     pub exam: Option<Exam>,
     pub home: Home,
+    pub config: Config,
 }
 
 impl Exam {

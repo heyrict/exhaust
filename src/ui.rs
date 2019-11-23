@@ -51,9 +51,9 @@ impl<'a> HomeWidget<'a> {
             modifier: Modifier::UNDERLINED,
         };
         const HIGHLIGHT_STYLE: Style = Style {
-            fg: Color::Reset,
-            bg: Color::Reset,
-            modifier: Modifier::REVERSED,
+            fg: Color::Gray,
+            bg: Color::Black,
+            modifier: Modifier::empty(),
         };
 
         let messages: [Text; 9] = [
@@ -165,11 +165,12 @@ impl<'a> ExamWidget<'a> {
     }
 
     pub fn draw<B: Backend>(&mut self, frame: &mut Frame<B>, content: Rect) {
+        let sidebar_length = self.app.config.items_per_line * 4 + 1;
         let main_chunks = Layout::default()
             .direction(Direction::Horizontal)
             .margin(1)
             // Main View and Sidebar
-            .constraints([Constraint::Min(30), Constraint::Length(18)].as_ref())
+            .constraints([Constraint::Min(30), Constraint::Length(sidebar_length)].as_ref())
             .split(content);
 
         ItemWidget::new(self.app).draw(frame, main_chunks[0]);
@@ -465,6 +466,7 @@ impl<'a> ExamItemsWidget<'a> {
         };
 
         let qitems = self.app.exam.as_ref().unwrap().questions.iter().enumerate();
+        let items_per_line = self.app.config.items_per_line;
 
         match self.app.exam.as_ref().unwrap().result {
             ExamResult::Pending => qitems.for_each(|(index, item)| {
@@ -483,7 +485,7 @@ impl<'a> ExamItemsWidget<'a> {
                 }
 
                 // Separator
-                if index % 4 == 3 {
+                if (index + 1) as u16 % items_per_line == 0 {
                     texts.push(Text::raw("\n"));
                 } else {
                     texts.push(Text::raw(" "));
@@ -518,7 +520,7 @@ impl<'a> ExamItemsWidget<'a> {
                 };
 
                 // Separator
-                if index % 4 == 3 {
+                if (index + 1) as u16 % items_per_line == 0 {
                     texts.push(Text::raw("\n"));
                 } else {
                     texts.push(Text::raw(" "));
