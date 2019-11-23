@@ -267,14 +267,26 @@ impl<'a> QuestionWidget<'a> {
             &self.app.exam.as_ref().unwrap().num_questions()
         );
 
+        // Question + Selections
+        let two_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Min(10), Constraint::Length(12)].as_ref())
+            .split(content);
+
+        let three_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(
+                [
+                    Constraint::Min(10),
+                    Constraint::Length(12),
+                    Constraint::Min(10),
+                ]
+                .as_ref(),
+            )
+            .split(content);
+
         match self.app.exam.as_ref().unwrap().result {
             ExamResult::Pending => {
-                // Question + Selections
-                let main_chunks = Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints([Constraint::Min(10), Constraint::Length(12)].as_ref())
-                    .split(content);
-
                 // Question
                 Paragraph::new([Text::raw(&self.question.question)].iter())
                     .block(
@@ -283,7 +295,7 @@ impl<'a> QuestionWidget<'a> {
                             .title(&question_title),
                     )
                     .wrap(true)
-                    .render(frame, main_chunks[0]);
+                    .render(frame, two_chunks[0]);
 
                 // Selections
                 let selections_state = self
@@ -299,32 +311,19 @@ impl<'a> QuestionWidget<'a> {
                         }
                     })
                     .collect();
-                let _selections =
-                    ToggleButtons::new(selections_state).render(frame, main_chunks[1]);
+
+                ToggleButtons::new(selections_state).render(frame, two_chunks[1]);
             }
             ExamResult::Done => {
-                // Question + Selection + Answer
-                let main_chunks = Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints(
-                        [
-                            Constraint::Min(10),
-                            Constraint::Length(12),
-                            Constraint::Min(10),
-                        ]
-                        .as_ref(),
-                    )
-                    .split(content);
-
                 // Question
-                let _question = Paragraph::new([Text::raw(&self.question.question)].iter())
+                let question_text = [Text::raw(&self.question.question)];
+                let mut question_block = Paragraph::new(question_text.iter())
                     .block(
                         Block::default()
                             .borders(Borders::ALL)
                             .title(&question_title),
                     )
-                    .wrap(true)
-                    .render(frame, main_chunks[0]);
+                    .wrap(true);
 
                 // Selection
                 let selections_state = self
@@ -352,18 +351,31 @@ impl<'a> QuestionWidget<'a> {
                         }
                     })
                     .collect();
-                let _selections =
-                    ToggleButtons::new(selections_state).render(frame, main_chunks[1]);
+                let mut selections_block = ToggleButtons::new(selections_state);
 
                 // Answer
                 let answer = match self.question.answer.as_ref() {
                     Some(answer) => answer,
                     None => "",
                 };
-                let _answer = Paragraph::new([Text::raw(answer)].iter())
+                let answer_text = [Text::raw(answer)];
+                let mut answer_block = Paragraph::new(answer_text.iter())
                     .block(Block::default().borders(Borders::TOP).title("­Answer"))
-                    .wrap(true)
-                    .render(frame, main_chunks[2]);
+                    .wrap(true);
+
+                match self.question.answer.is_some() {
+                    true => {
+                        // Question + Selection
+                        question_block.render(frame, three_chunks[0]);
+                        selections_block.render(frame, three_chunks[1]);
+                        answer_block.render(frame, three_chunks[2]);
+                    }
+                    false => {
+                        // Question + Selection + Answer
+                        question_block.render(frame, two_chunks[0]);
+                        selections_block.render(frame, two_chunks[1]);
+                    }
+                }
             }
         }
     }
