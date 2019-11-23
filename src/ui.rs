@@ -1,6 +1,4 @@
 use crossterm::input::{InputEvent, KeyEvent};
-use std::fs::read_dir;
-use std::path::PathBuf;
 use std::sync::mpsc;
 use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout, Rect};
@@ -75,10 +73,7 @@ impl<'a> HomeWidget<'a> {
             },
             Text::raw("]"),
         ];
-        let paths: Vec<PathBuf> = read_dir(&self.app.home.current_path)
-            .unwrap()
-            .map(|path| path.unwrap().path())
-            .collect();
+        let paths = self.app.home.get_paths().unwrap();
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(5), Constraint::Min(6)].as_ref())
@@ -117,12 +112,12 @@ impl<'a> HomeWidget<'a> {
                     tx.send(Messages::LoadFile).unwrap();
                     None
                 }
-                KeyEvent::Char('j') => {
+                KeyEvent::Char('j') | KeyEvent::Down => {
                     tx.send(Messages::UpdateHomeSelected(UpdateHomeSelectedEvent::Next))
                         .unwrap();
                     None
                 }
-                KeyEvent::Char('k') => {
+                KeyEvent::Char('k') | KeyEvent::Up => {
                     tx.send(Messages::UpdateHomeSelected(UpdateHomeSelectedEvent::Prev))
                         .unwrap();
                     None

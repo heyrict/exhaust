@@ -173,14 +173,19 @@ impl Default for Home {
 }
 
 impl Home {
-    pub fn get_selected_file(&self) -> Option<PathBuf> {
-        let paths: Vec<PathBuf> = read_dir(&self.current_path)
-            .ok()?
-            .map(|path| path.unwrap().path())
-            .collect();
+    pub fn get_selected_path(&self) -> Option<PathBuf> {
+        let paths = self.get_paths().ok()?;
         paths
             .get(self.current_selected?)
             .map(|path| path.to_path_buf())
+    }
+
+    pub fn get_paths(&self) -> Result<Vec<PathBuf>, std::io::Error> {
+        read_dir(&self.current_path).map(|result| {
+            let mut paths: Vec<PathBuf> = result.map(|path| path.unwrap().path()).collect();
+            paths.sort();
+            paths
+        })
     }
 }
 

@@ -1,9 +1,7 @@
 use crate::app::*;
 use crate::event::*;
-use std::fs::read_dir;
 use std::fs::File;
 use std::io::{Read, Write};
-use std::path::PathBuf;
 use std::sync::mpsc;
 use std::thread;
 
@@ -40,7 +38,7 @@ pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> O
                     match &event {
                         Messages::ToggleSelection(_) => {
                             let exam_copy = state.exam.clone();
-                            let maybe_filename = state.home.get_selected_file();
+                            let maybe_filename = state.home.get_selected_path();
                             thread::spawn(move || {
                                 maybe_filename.map(|filename| {
                                     let mut file = File::create(&filename).expect(&format!(
@@ -111,10 +109,7 @@ pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> O
         }
         Messages::UpdateHomeSelected(evt) => match &state.route {
             AppRoute::Home => {
-                let paths: Vec<PathBuf> = read_dir(&state.home.current_path)
-                    .unwrap()
-                    .map(|path| path.unwrap().path())
-                    .collect();
+                let paths = state.home.get_paths().unwrap();
                 let max_index = if paths.len() > 0 {
                     paths.len() - 1
                 } else {
@@ -151,7 +146,7 @@ pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> O
             _ => None,
         },
         Messages::LoadFile => {
-            let filename = state.home.get_selected_file()?;
+            let filename = state.home.get_selected_path()?;
             match filename.is_dir() {
                 true => {
                     state.home.current_path = filename.to_path_buf();
