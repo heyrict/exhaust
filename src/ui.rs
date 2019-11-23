@@ -445,10 +445,26 @@ impl<'a> ExamItemsWidget<'a> {
 
     pub fn draw<B: Backend>(&mut self, frame: &mut Frame<B>, content: Rect) {
         let mut texts: Vec<Text> = vec![];
+        let exam = self.app.exam.as_ref().unwrap();
+        let num_questions = exam.num_questions();
         let current_index = if let AppRoute::DoExam(display) = &self.app.route {
             display.question_index
         } else {
             0
+        };
+
+        let selections_height = if num_questions as u16 % self.app.config.items_per_line == 0 {
+            num_questions as u16 / self.app.config.items_per_line
+        } else {
+            num_questions as u16 / self.app.config.items_per_line + 1
+        };
+        let scroll_pos = if content.height >= selections_height + 2 {
+            0
+        } else {
+            let diff = 2 + selections_height - content.height;
+            let mut a = (diff as usize * current_index) as f32;
+            a /= num_questions as f32;
+            a.round() as u16
         };
 
         const PENDING_STYLE: Style = Style {
@@ -477,10 +493,10 @@ impl<'a> ExamItemsWidget<'a> {
             modifier: Modifier::empty(),
         };
 
-        let qitems = self.app.exam.as_ref().unwrap().questions.iter().enumerate();
+        let qitems = exam.questions.iter().enumerate();
         let items_per_line = self.app.config.items_per_line;
 
-        match self.app.exam.as_ref().unwrap().result {
+        match exam.result {
             ExamResult::Pending => qitems.for_each(|(index, item)| {
                 // Text
                 if index == current_index {
@@ -542,6 +558,7 @@ impl<'a> ExamItemsWidget<'a> {
 
         Paragraph::new(texts.iter())
             .block(Block::default().borders(Borders::ALL).title("Items"))
+            .scroll(scroll_pos)
             .render(frame, content);
     }
 
