@@ -1,23 +1,21 @@
 {
   "questions": [
     {
-      "Question": {
-        "question": "Game Over. Continue?",
-        "selections": [
-          { "text": "No", "should_select": false },
-          { "text": "Yes", "should_select": true }
-        ],
-        "answer": "You should select yes"
-      }
+      "type": "Question",
+      "question": "Game Over. Continue?",
+      "selections": [
+        { "text": "No", "should_select": false },
+        { "text": "Yes", "should_select": true }
+      ],
+      "answer": "You should select yes"
     },
     {
-      "Question": {
-        "question": "Select your gender",
-        "selections": [
-          { "text": "Male", "should_select": false },
-          { "text": "Female", "should_select": false }
-        ]
-      }
+      "type": "Question",
+      "question": "Select your gender",
+      "selections": [
+        { "text": "Male", "should_select": false },
+        { "text": "Female", "should_select": false }
+      ]
     }
   ]
 }

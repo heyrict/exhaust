@@ -77,6 +77,7 @@ pub struct Card {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub enum Item {
     Question(Question),
     Card(Card),
