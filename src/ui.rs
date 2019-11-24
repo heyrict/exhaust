@@ -22,7 +22,7 @@ impl<'a> AppWidget<'a> {
     pub fn draw<B: Backend>(&mut self, frame: &mut Frame<B>, content: Rect) {
         match &self.app.route {
             AppRoute::Home => HomeWidget::new(self.app).draw(frame, content),
-            AppRoute::DoExam(_) => ExamWidget::new(self.app).draw(frame, content),
+            AppRoute::DoExam => ExamWidget::new(self.app).draw(frame, content),
         };
     }
 
@@ -30,7 +30,7 @@ impl<'a> AppWidget<'a> {
         // Propagation
         match state.route {
             AppRoute::Home => HomeWidget::propagate(state, event, tx),
-            AppRoute::DoExam(_) => ExamWidget::propagate(state, event, tx),
+            AppRoute::DoExam => ExamWidget::propagate(state, event, tx),
         }
     }
 }
@@ -204,18 +204,15 @@ impl<'a> ItemWidget<'a> {
 
     pub fn draw<B: Backend>(&mut self, frame: &mut Frame<B>, content: Rect) {
         match &self.app.route {
-            AppRoute::DoExam(display) => {
-                let item: &Item = self
-                    .app
-                    .exam
-                    .as_ref()
-                    .unwrap()
-                    .question_at(display.question_index)
+            AppRoute::DoExam => {
+                let exam = self.app.exam.as_ref().unwrap();
+                let item: &Item = exam
+                    .question_at(exam.display.question_index)
                     .expect("Item out of range!");
 
                 match item {
                     Item::Question(question) => {
-                        QuestionWidget::new(self.app, &question, &display).draw(frame, content)
+                        QuestionWidget::new(self.app, &question, &exam.display).draw(frame, content)
                     }
                     _ => {}
                 }
@@ -226,13 +223,9 @@ impl<'a> ItemWidget<'a> {
 
     pub fn propagate(state: &App, event: Messages, tx: mpsc::Sender<Messages>) -> Option<Messages> {
         match &state.route {
-            AppRoute::DoExam(display) => {
-                match &state
-                    .exam
-                    .as_ref()
-                    .unwrap()
-                    .question_at(display.question_index)
-                {
+            AppRoute::DoExam => {
+                let exam = state.exam.as_ref().unwrap();
+                match exam.question_at(exam.display.question_index) {
                     Some(item) => match item {
                         Item::Question(_) => QuestionWidget::propagate(state, event, tx),
                         _ => Some(event),
@@ -285,8 +278,8 @@ impl<'a> QuestionWidget<'a> {
             )
             .split(content);
 
-        match self.app.exam.as_ref().unwrap().result {
-            ExamResult::Pending => {
+        match self.app.exam.as_ref().unwrap().display.display_answer {
+            false => {
                 // Question
                 Paragraph::new([Text::raw(&self.question.question)].iter())
                     .block(
@@ -315,7 +308,7 @@ impl<'a> QuestionWidget<'a> {
 
                 ToggleButtons::new(selections_state).render(frame, two_chunks[1]);
             }
-            ExamResult::Done => {
+            true => {
                 // Question
                 let question_text = [Text::raw(&self.question.question)];
                 let mut question_block = Paragraph::new(question_text.iter())
@@ -449,11 +442,7 @@ impl<'a> ExamItemsWidget<'a> {
         let mut texts: Vec<Text> = vec![];
         let exam = self.app.exam.as_ref().unwrap();
         let num_questions = exam.num_questions();
-        let current_index = if let AppRoute::DoExam(display) = &self.app.route {
-            display.question_index
-        } else {
-            0
-        };
+        let current_index = exam.display.question_index;
 
         let selections_height = if num_questions as u16 % self.app.config.items_per_line == 0 {
             num_questions as u16 / self.app.config.items_per_line
@@ -498,8 +487,8 @@ impl<'a> ExamItemsWidget<'a> {
         let qitems = exam.questions.iter().enumerate();
         let items_per_line = self.app.config.items_per_line;
 
-        match exam.result {
-            ExamResult::Pending => qitems.for_each(|(index, item)| {
+        match exam.display.display_answer {
+            false => qitems.for_each(|(index, item)| {
                 // Text
                 if index == current_index {
                     texts.push(Text::styled(format!("{:3}", &index + 1), CURRENT_STYLE));
@@ -521,7 +510,7 @@ impl<'a> ExamItemsWidget<'a> {
                     texts.push(Text::raw(" "));
                 }
             }),
-            ExamResult::Done => qitems.for_each(|(index, item)| {
+            true => qitems.for_each(|(index, item)| {
                 // Text
                 match item {
                     Item::Question(question) => {

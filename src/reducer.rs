@@ -13,8 +13,9 @@ pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> O
             None
         }
         Messages::ToggleSelection(sel) => match &state.route {
-            AppRoute::DoExam(display) => {
-                let index = display.question_index;
+            AppRoute::DoExam => {
+                let exam = &state.exam.as_ref().unwrap();
+                let index = exam.display.question_index;
                 let question = state.exam.as_mut().unwrap().question_at_mut(index)?;
                 let returns = match question {
                     Item::Question(q) => {
@@ -66,19 +67,21 @@ pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> O
             _ => Some(event),
         },
         Messages::UpdateQuestionIndex(evt) => match &state.route {
-            AppRoute::DoExam(display) => {
-                let max_index = state.exam.as_mut().unwrap().num_questions() - 1;
+            AppRoute::DoExam => {
+                let exam = &state.exam.as_ref().unwrap();
+                let question_index = exam.display.question_index;
+                let max_index = exam.num_questions() - 1;
                 let next_index = match &evt {
                     UpdateQuestionIndexEvent::Next => {
-                        if display.question_index < max_index {
-                            display.question_index + 1
+                        if question_index < max_index {
+                            question_index + 1
                         } else {
                             0
                         }
                     }
                     UpdateQuestionIndexEvent::Prev => {
-                        if display.question_index > 0 {
-                            display.question_index - 1
+                        if question_index > 0 {
+                            question_index - 1
                         } else {
                             max_index
                         }
@@ -91,20 +94,17 @@ pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> O
                         }
                     }
                 };
-                let new_display = DoExamDisplay {
-                    question_index: next_index,
-                    ..display.clone()
-                };
-                state.route = AppRoute::DoExam(new_display);
+                state.exam.as_mut().map(move |exam| {
+                    exam.display.question_index = next_index;
+                });
                 None
             }
             _ => None,
         },
         Messages::ToggleExamResult => {
-            state.exam.as_mut().unwrap().result = match state.exam.as_ref().unwrap().result {
-                ExamResult::Done => ExamResult::Pending,
-                ExamResult::Pending => ExamResult::Done,
-            };
+            state.exam.as_mut().map(|exam| {
+                exam.display.display_answer = !exam.display.display_answer;
+            });
             None
         }
         Messages::UpdateHomeSelected(evt) => match &state.route {
@@ -163,10 +163,7 @@ pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> O
                         let exam: Exam = serde_json::from_str(&contents)
                             .expect("Unable to convert file to string");
                         tx.send(Messages::FileLoaded(exam)).unwrap();
-                        tx.send(Messages::ChangeRoute(AppRoute::DoExam(
-                            DoExamDisplay::default(),
-                        )))
-                        .unwrap();
+                        tx.send(Messages::ChangeRoute(AppRoute::DoExam)).unwrap();
                     });
                 }
             };

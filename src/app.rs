@@ -86,7 +86,7 @@ pub enum Item {
 pub struct Exam {
     pub questions: Vec<Item>,
     #[serde(default)]
-    pub result: ExamResult,
+    pub display: DoExamDisplay,
 }
 
 #[derive(Clone, Debug)]
@@ -98,18 +98,6 @@ pub enum QuestionResult {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum ExamResult {
-    Pending,
-    Done,
-}
-
-impl Default for ExamResult {
-    fn default() -> Self {
-        ExamResult::Pending
-    }
-}
-
-#[derive(Clone, Debug)]
 pub struct DoExamDisplay {
     pub question_index: usize,
     pub display_answer: bool,
@@ -133,7 +121,7 @@ impl DoExamDisplay {
 #[derive(Debug)]
 pub enum AppRoute {
     Home,
-    DoExam(DoExamDisplay),
+    DoExam,
 }
 
 impl Default for AppRoute {
