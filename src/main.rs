@@ -9,6 +9,7 @@ mod ui;
 mod widget;
 
 use app::*;
+use reducer::maybe_save_state;
 
 use std::error::Error;
 
@@ -54,8 +55,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         })?;
         let next_event = events.next()?;
         match next_event {
-            Messages::Input(InputEvent::Keyboard(KeyEvent::Char('Q'))) => break,
-            Messages::Quit => break,
+            Messages::Input(InputEvent::Keyboard(KeyEvent::Char('Q'))) | Messages::Quit => {
+                // Only saves when quitting from DoExam page
+                if let AppRoute::DoExam = &app.route {
+                    let handle = maybe_save_state(&app);
+
+                    // Wait for saving thread to finish
+                    handle.map(|hdl| hdl.join().ok());
+                }
+                break;
+            }
             _ => {
                 reducer::reduce(&mut app, next_event, events.tx.clone())
                     .map(|evt: Messages| ui::AppWidget::propagate(&app, evt, events.tx.clone()));

@@ -4,11 +4,17 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::sync::mpsc;
 use std::thread;
+use std::thread::JoinHandle;
 
 pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> Option<Messages> {
     // Route handler
     match event {
         Messages::ChangeRoute(route) => {
+            // Saves data when quit from DoExam route
+            if let AppRoute::DoExam = state.route {
+                maybe_save_state(&state);
+            };
+
             state.route = route;
             None
         }
@@ -33,34 +39,9 @@ pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> O
                     _ => None,
                 };
 
-                // Save data on selection change
-                // TODO: Move save to a separate event;
-                if let OpenMode::Write = &state.home.open_mode {
-                    match &event {
-                        Messages::ToggleSelection(_) => {
-                            let exam_copy = state.exam.clone();
-                            let maybe_filename = state.home.get_selected_path();
-                            thread::spawn(move || {
-                                maybe_filename.map(|filename| {
-                                    let mut file = File::create(&filename).expect(&format!(
-                                        "Error opening {}",
-                                        &filename.to_str().unwrap()
-                                    ));
-                                    file.write_all(
-                                        serde_json::to_string(&exam_copy)
-                                            .expect("Error converting exam to json")
-                                            .as_ref(),
-                                    )
-                                    .expect(&format!(
-                                        "Error writing {}",
-                                        &filename.to_str().unwrap()
-                                    ));
-                                });
-                            });
-                        }
-                        _ => {}
-                    };
-                }
+                // Saves data after updating selections.
+                // This process should not block the main thread.
+                maybe_save_state(&state);
 
                 returns
             }
@@ -189,5 +170,27 @@ pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> O
             None
         }
         _ => Some(event),
+    }
+}
+
+pub fn maybe_save_state(state: &App) -> Option<JoinHandle<()>> {
+    // Save data on selection change
+    if let OpenMode::Write = &state.home.open_mode {
+        let exam_copy = state.exam.clone();
+        let maybe_filename = state.home.get_selected_path();
+        Some(thread::spawn(move || {
+            maybe_filename.map(|filename| {
+                let mut file = File::create(&filename)
+                    .expect(&format!("Error opening {}", &filename.to_str().unwrap()));
+                file.write_all(
+                    serde_json::to_string(&exam_copy)
+                        .expect("Error converting exam to json")
+                        .as_ref(),
+                )
+                .expect(&format!("Error writing {}", &filename.to_str().unwrap()));
+            });
+        }))
+    } else {
+        None
     }
 }
