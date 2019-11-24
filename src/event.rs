@@ -26,6 +26,7 @@ pub enum Messages {
     Input(InputEvent),
     ChangeRoute(AppRoute),
     UpdateQuestionIndex(UpdateQuestionIndexEvent),
+    ScrollQuestion(u16),
     UpdateHomeSelected(UpdateHomeSelectedEvent),
     ToggleSelection(SelectionFlags),
     LoadFile,

@@ -100,6 +100,7 @@ pub enum QuestionResult {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DoExamDisplay {
     pub question_index: usize,
+    pub question_scroll_pos: u16,
     pub display_answer: bool,
 }
 
@@ -107,6 +108,7 @@ impl Default for DoExamDisplay {
     fn default() -> Self {
         DoExamDisplay {
             question_index: 0,
+            question_scroll_pos: 0,
             display_answer: false,
         }
     }

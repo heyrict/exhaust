@@ -288,6 +288,7 @@ impl<'a> QuestionWidget<'a> {
                             .title(&question_title),
                     )
                     .wrap(true)
+                    .scroll(self.display.question_scroll_pos)
                     .render(frame, two_chunks[0]);
 
                 // Selections
@@ -317,6 +318,7 @@ impl<'a> QuestionWidget<'a> {
                             .borders(Borders::ALL)
                             .title(&question_title),
                     )
+                    .scroll(self.display.question_scroll_pos)
                     .wrap(true);
 
                 // Selection
@@ -356,6 +358,7 @@ impl<'a> QuestionWidget<'a> {
                 let answer_text = [Text::raw(answer)];
                 let mut answer_block = Paragraph::new(answer_text.iter())
                     .block(Block::default().borders(Borders::TOP).title("­Answer"))
+                    .scroll(self.display.question_scroll_pos)
                     .wrap(true);
 
                 match self.question.answer.is_some() {
@@ -375,11 +378,7 @@ impl<'a> QuestionWidget<'a> {
         }
     }
 
-    pub fn propagate(
-        _state: &App,
-        event: Messages,
-        tx: mpsc::Sender<Messages>,
-    ) -> Option<Messages> {
+    pub fn propagate(state: &App, event: Messages, tx: mpsc::Sender<Messages>) -> Option<Messages> {
         match event {
             Messages::Input(InputEvent::Keyboard(key)) => match key {
                 KeyEvent::Char('a') | KeyEvent::Char('A') => {
@@ -420,6 +419,25 @@ impl<'a> QuestionWidget<'a> {
                 KeyEvent::Char('h') | KeyEvent::Char('H') => {
                     tx.send(Messages::ToggleSelection(SelectionFlags::H))
                         .unwrap();
+                    None
+                }
+                KeyEvent::Char('j') => {
+                    state.exam.as_ref().map(|exam: &Exam| {
+                        tx.send(Messages::ScrollQuestion(
+                            &exam.display.question_scroll_pos + 1,
+                        ))
+                        .unwrap();
+                    });
+                    None
+                }
+                KeyEvent::Char('k') => {
+                    state.exam.as_ref().map(|exam: &Exam| {
+                        let next_pos = match &exam.display.question_scroll_pos {
+                            0 => 0,
+                            _ => &exam.display.question_scroll_pos - 1,
+                        };
+                        tx.send(Messages::ScrollQuestion(next_pos)).unwrap();
+                    });
                     None
                 }
                 _ => Some(event),

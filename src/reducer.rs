@@ -49,7 +49,7 @@ pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> O
         },
         Messages::UpdateQuestionIndex(evt) => match &state.route {
             AppRoute::DoExam => {
-                let exam = &state.exam.as_ref().unwrap();
+                let exam = state.exam.as_ref().unwrap();
                 let question_index = exam.display.question_index;
                 let max_index = exam.num_questions() - 1;
                 let next_index = match &evt {
@@ -76,12 +76,22 @@ pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> O
                     }
                 };
                 state.exam.as_mut().map(move |exam| {
+                    // Update question index
                     exam.display.question_index = next_index;
+
+                    // Reset scroll position
+                    exam.display.question_scroll_pos = 0;
                 });
                 None
             }
             _ => None,
         },
+        Messages::ScrollQuestion(pos) => {
+            state.exam.as_mut().map(move |exam: &mut Exam| {
+                exam.display.question_scroll_pos = pos;
+            });
+            None
+        }
         Messages::ToggleExamResult => {
             state.exam.as_mut().map(|exam| {
                 exam.display.display_answer = !exam.display.display_answer;
