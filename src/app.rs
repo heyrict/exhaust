@@ -174,7 +174,19 @@ impl Home {
 
     pub fn get_paths(&self) -> Result<Vec<PathBuf>, std::io::Error> {
         read_dir(&self.current_path).map(|result| {
-            let mut paths: Vec<PathBuf> = result.map(|path| path.unwrap().path()).collect();
+            let mut paths: Vec<PathBuf> = result
+                .map(|path| path.unwrap().path())
+                .filter(|path| {
+                    path.is_dir()
+                        || match path.extension() {
+                            Some(ext) => match ext.to_str() {
+                                Some("json") => true,
+                                _ => false,
+                            },
+                            _ => false,
+                        }
+                })
+                .collect();
             paths.sort();
             paths
         })
