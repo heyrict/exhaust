@@ -4,7 +4,7 @@ use crate::app::{AppRoute, OpenMode, SelectionFlags};
 use std::sync::mpsc;
 use std::thread;
 
-use crossterm::input::{input, InputEvent};
+use crossterm::event::{read, Event, KeyEvent};
 
 #[derive(Debug)]
 pub enum UpdateQuestionIndexEvent {
@@ -23,7 +23,8 @@ pub enum UpdateHomeSelectedEvent {
 
 #[derive(Debug)]
 pub enum Messages {
-    Input(InputEvent),
+    Input(KeyEvent),
+    Resize,
     ChangeRoute(AppRoute),
     UpdateQuestionIndex(UpdateQuestionIndexEvent),
     ScrollQuestion(u16),
@@ -50,14 +51,20 @@ impl Events {
         let (tx, rx) = mpsc::channel();
         let input_handle = {
             let tx = tx.clone();
-            thread::spawn(move || {
-                let input = input();
-                let mut reader = input.read_sync();
-                loop {
-                    if let Some(evt) = reader.next() {
-                        if let Err(_) = tx.send(Messages::Input(evt)) {
-                            return;
+            thread::spawn(move || loop {
+                if let Ok(event) = read() {
+                    match event {
+                        Event::Key(keyevent) => {
+                            if let Err(_) = tx.send(Messages::Input(keyevent)) {
+                                return;
+                            }
                         }
+                        Event::Resize(_, _) => {
+                            if let Err(_) = tx.send(Messages::Resize) {
+                                return;
+                            }
+                        }
+                        _ => {}
                     }
                 }
             })

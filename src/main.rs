@@ -17,19 +17,24 @@ use event::Messages;
 use tui::widgets::{Block, Borders, Widget};
 
 use crossterm::{
-    input::{InputEvent, KeyEvent},
-    screen::AlternateScreen,
+    event::{KeyCode, KeyEvent},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use tui::backend::CrosstermBackend;
 use tui::Terminal;
 
-use std::io::stdout;
+use std::io::{stdout, Write};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let screen = AlternateScreen::to_alternate(true)?;
-    let backend = CrosstermBackend::with_alternate_screen(stdout(), screen)?;
-    let events = event::Events::new();
+    enable_raw_mode()?;
+    let mut stdout = stdout();
+    execute!(stdout, EnterAlternateScreen)?;
+
+    let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
+
+    let events = event::Events::new();
     terminal.hide_cursor()?;
 
     let mut app = App::default();
@@ -55,7 +60,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         })?;
         let next_event = events.next()?;
         match next_event {
-            Messages::Input(InputEvent::Keyboard(KeyEvent::Char('Q'))) | Messages::Quit => {
+            Messages::Input(KeyEvent {
+                code: KeyCode::Char('Q'),
+                ..
+            })
+            | Messages::Quit => {
                 // Only saves when quitting from DoExam page
                 if let AppRoute::DoExam = &app.route {
                     let handle = maybe_save_state(&app);
@@ -63,6 +72,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                     // Wait for saving thread to finish
                     handle.map(|hdl| hdl.join().ok());
                 }
+                disable_raw_mode()?;
+                execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+                terminal.show_cursor()?;
                 break;
             }
             _ => {

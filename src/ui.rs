@@ -1,4 +1,4 @@
-use crossterm::input::{InputEvent, KeyEvent};
+use crossterm::event::KeyCode;
 use std::sync::mpsc;
 use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout, Rect};
@@ -107,44 +107,44 @@ impl<'a> HomeWidget<'a> {
         tx: mpsc::Sender<Messages>,
     ) -> Option<Messages> {
         match event {
-            Messages::Input(InputEvent::Keyboard(key)) => match key {
-                KeyEvent::Enter => {
+            Messages::Input(keyevent) => match keyevent.code {
+                KeyCode::Enter => {
                     tx.send(Messages::LoadFile).unwrap();
                     None
                 }
-                KeyEvent::Char('j') | KeyEvent::Down => {
+                KeyCode::Char('j') | KeyCode::Down => {
                     tx.send(Messages::UpdateHomeSelected(UpdateHomeSelectedEvent::Next))
                         .unwrap();
                     None
                 }
-                KeyEvent::Char('k') | KeyEvent::Up => {
+                KeyCode::Char('k') | KeyCode::Up => {
                     tx.send(Messages::UpdateHomeSelected(UpdateHomeSelectedEvent::Prev))
                         .unwrap();
                     None
                 }
-                KeyEvent::Char('g') => {
+                KeyCode::Char('g') => {
                     tx.send(Messages::UpdateHomeSelected(UpdateHomeSelectedEvent::Home))
                         .unwrap();
                     None
                 }
-                KeyEvent::Char('G') => {
+                KeyCode::Char('G') => {
                     tx.send(Messages::UpdateHomeSelected(UpdateHomeSelectedEvent::End))
                         .unwrap();
                     None
                 }
-                KeyEvent::Char('u') => {
+                KeyCode::Char('u') => {
                     tx.send(Messages::LoadUpperDirectory).unwrap();
                     None
                 }
-                KeyEvent::Char('r') => {
+                KeyCode::Char('r') => {
                     tx.send(Messages::SetOpenMode(OpenMode::ReadOnly)).unwrap();
                     None
                 }
-                KeyEvent::Char('w') => {
+                KeyCode::Char('w') => {
                     tx.send(Messages::SetOpenMode(OpenMode::Write)).unwrap();
                     None
                 }
-                KeyEvent::Char('q') => {
+                KeyCode::Char('q') => {
                     tx.send(Messages::Quit).unwrap();
                     None
                 }
@@ -179,17 +179,21 @@ impl<'a> ExamWidget<'a> {
 
     pub fn propagate(state: &App, event: Messages, tx: mpsc::Sender<Messages>) -> Option<Messages> {
         match &event {
-            Messages::Input(InputEvent::Keyboard(KeyEvent::Char('q'))) => {
-                tx.send(Messages::ChangeRoute(AppRoute::Home)).unwrap();
-                None
-            }
-            Messages::Input(InputEvent::Keyboard(KeyEvent::Char(' '))) => {
-                tx.send(Messages::ToggleExamResult).unwrap();
-                None
-            }
-            _ => ExamItemsWidget::propagate(state, event, tx.clone())
-                .and_then(|event| ItemWidget::propagate(state, event, tx)),
-        }
+            Messages::Input(keyevent) => match keyevent.code {
+                KeyCode::Char('q') => {
+                    tx.send(Messages::ChangeRoute(AppRoute::Home)).unwrap();
+                    return None;
+                }
+                KeyCode::Char(' ') => {
+                    tx.send(Messages::ToggleExamResult).unwrap();
+                    return None;
+                }
+                _ => {}
+            },
+            _ => {}
+        };
+        ExamItemsWidget::propagate(state, event, tx.clone())
+            .and_then(|event| ItemWidget::propagate(state, event, tx))
     }
 }
 
@@ -380,48 +384,48 @@ impl<'a> QuestionWidget<'a> {
 
     pub fn propagate(state: &App, event: Messages, tx: mpsc::Sender<Messages>) -> Option<Messages> {
         match event {
-            Messages::Input(InputEvent::Keyboard(key)) => match key {
-                KeyEvent::Char('a') | KeyEvent::Char('A') => {
+            Messages::Input(keyevent) => match keyevent.code {
+                KeyCode::Char('a') | KeyCode::Char('A') => {
                     tx.send(Messages::ToggleSelection(SelectionFlags::A))
                         .unwrap();
                     None
                 }
-                KeyEvent::Char('b') | KeyEvent::Char('B') => {
+                KeyCode::Char('b') | KeyCode::Char('B') => {
                     tx.send(Messages::ToggleSelection(SelectionFlags::B))
                         .unwrap();
                     None
                 }
-                KeyEvent::Char('c') | KeyEvent::Char('C') => {
+                KeyCode::Char('c') | KeyCode::Char('C') => {
                     tx.send(Messages::ToggleSelection(SelectionFlags::C))
                         .unwrap();
                     None
                 }
-                KeyEvent::Char('d') | KeyEvent::Char('D') => {
+                KeyCode::Char('d') | KeyCode::Char('D') => {
                     tx.send(Messages::ToggleSelection(SelectionFlags::D))
                         .unwrap();
                     None
                 }
-                KeyEvent::Char('e') | KeyEvent::Char('E') => {
+                KeyCode::Char('e') | KeyCode::Char('E') => {
                     tx.send(Messages::ToggleSelection(SelectionFlags::E))
                         .unwrap();
                     None
                 }
-                KeyEvent::Char('f') | KeyEvent::Char('F') => {
+                KeyCode::Char('f') | KeyCode::Char('F') => {
                     tx.send(Messages::ToggleSelection(SelectionFlags::F))
                         .unwrap();
                     None
                 }
-                KeyEvent::Char('g') | KeyEvent::Char('G') => {
+                KeyCode::Char('g') | KeyCode::Char('G') => {
                     tx.send(Messages::ToggleSelection(SelectionFlags::G))
                         .unwrap();
                     None
                 }
-                KeyEvent::Char('h') | KeyEvent::Char('H') => {
+                KeyCode::Char('h') | KeyCode::Char('H') => {
                     tx.send(Messages::ToggleSelection(SelectionFlags::H))
                         .unwrap();
                     None
                 }
-                KeyEvent::Char('j') => {
+                KeyCode::Char('j') => {
                     state.exam.as_ref().map(|exam: &Exam| {
                         tx.send(Messages::ScrollQuestion(
                             &exam.display.question_scroll_pos + 1,
@@ -430,7 +434,7 @@ impl<'a> QuestionWidget<'a> {
                     });
                     None
                 }
-                KeyEvent::Char('k') => {
+                KeyCode::Char('k') => {
                     state.exam.as_ref().map(|exam: &Exam| {
                         let next_pos = match &exam.display.question_scroll_pos {
                             0 => 0,
@@ -577,15 +581,15 @@ impl<'a> ExamItemsWidget<'a> {
         tx: mpsc::Sender<Messages>,
     ) -> Option<Messages> {
         match event {
-            Messages::Input(InputEvent::Keyboard(key)) => match key {
-                KeyEvent::Char('>') | KeyEvent::Char('n') => {
+            Messages::Input(keyevent) => match keyevent.code {
+                KeyCode::Char('>') | KeyCode::Char('n') => {
                     tx.send(Messages::UpdateQuestionIndex(
                         UpdateQuestionIndexEvent::Next,
                     ))
                     .unwrap();
                     None
                 }
-                KeyEvent::Char('<') | KeyEvent::Char('p') => {
+                KeyCode::Char('<') | KeyCode::Char('p') => {
                     tx.send(Messages::UpdateQuestionIndex(
                         UpdateQuestionIndexEvent::Prev,
                     ))

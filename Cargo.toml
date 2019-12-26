@@ -1,20 +1,19 @@
 [package]
 name = "exhaust"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["heyrict <xiezh0831@yahoo.co.jp>"]
 edition = "2018"
 
 [dependencies]
 unicode-width = "0.1.5"
-crossterm = "0.13"
+crossterm = "0.14"
 bitflags = "^1.2"
 
 serde = { version = "^1.0", features = ["derive"] }
 serde_json = "^1.0"
 
 [dependencies.tui]
-git = "https://github.com/heyrict/tui-rs"
-branch = "merge-crossterm-refactor"
+version = "0.8"
 default-features = false
 features = ["crossterm"]
 
