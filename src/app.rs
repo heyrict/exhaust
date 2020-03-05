@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::env::current_dir;
 use std::fs::read_dir;
 use std::path::PathBuf;
@@ -6,6 +7,7 @@ use std::path::PathBuf;
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Selection {
     pub text: String,
+    #[serde(default)]
     pub should_select: bool,
 }
 
@@ -41,6 +43,8 @@ pub struct Question {
     pub answer: Option<String>,
     #[serde(default, with = "selection_flags_serde")]
     pub user_selection: SelectionFlags,
+    #[serde(flatten)]
+    pub extra: HashMap<String, serde_json::Value>,
 }
 
 impl Question {
