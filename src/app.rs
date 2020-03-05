@@ -243,7 +243,9 @@ impl Question {
     }
 
     pub fn has_selection(&self, selection: SelectionFlags) -> bool {
-        selection.contains(selection)
+        // `selection` should not be greater than the char that
+        // the number of selections indicates.
+        selection.bits() >> self.num_selections() == 0
     }
 }
 
