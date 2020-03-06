@@ -92,6 +92,8 @@ pub struct Exam {
     pub questions: Vec<Item>,
     #[serde(default)]
     pub display: DoExamDisplay,
+    #[serde(flatten)]
+    pub extra: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Clone, Debug)]
