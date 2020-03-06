@@ -1,5 +1,6 @@
 use crate::app::*;
 use crate::event::*;
+use libflate::gzip::{Decoder, Encoder};
 use std::fs::File;
 use std::io::{Read, Write};
 use std::sync::mpsc;
@@ -143,20 +144,45 @@ pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> O
                     state.home.current_path = filename.to_path_buf();
                     state.home.current_selected = None;
                 }
-                false => {
-                    let mut file = File::open(filename).expect("Unable to open file");
-                    let tx = tx.clone();
+                false => match filename.extension() {
+                    Some(ext) => match ext.to_str() {
+                        Some("exhaust") | Some("gz") => {
+                            let file = File::open(filename).expect("Unable to open file");
+                            let tx = tx.clone();
 
-                    thread::spawn(move || {
-                        let mut contents = String::new();
-                        file.read_to_string(&mut contents)
-                            .expect("Unable to read file");
-                        let exam: Exam = serde_json::from_str(&contents)
-                            .expect("Unable to convert file to string");
-                        tx.send(Messages::FileLoaded(exam)).unwrap();
-                        tx.send(Messages::ChangeRoute(AppRoute::DoExam)).unwrap();
-                    });
-                }
+                            thread::spawn(move || {
+                                let mut decoder =
+                                    Decoder::new(&file).expect("Unable to decompress the file");
+                                let mut contents = String::new();
+                                decoder
+                                    .read_to_string(&mut contents)
+                                    .expect("Unable to decode the file with utf-8");
+
+                                let exam: Exam = serde_json::from_str(&contents)
+                                    .expect("Unable to convert file to string");
+                                tx.send(Messages::FileLoaded(exam)).unwrap();
+                                tx.send(Messages::ChangeRoute(AppRoute::DoExam)).unwrap();
+                            });
+                        }
+                        Some("json") => {
+                            // Parse Json
+                            let mut file = File::open(filename).expect("Unable to open file");
+                            let tx = tx.clone();
+
+                            thread::spawn(move || {
+                                let mut contents = String::new();
+                                file.read_to_string(&mut contents)
+                                    .expect("Unable to read file");
+                                let exam: Exam = serde_json::from_str(&contents)
+                                    .expect("Unable to convert file to string");
+                                tx.send(Messages::FileLoaded(exam)).unwrap();
+                                tx.send(Messages::ChangeRoute(AppRoute::DoExam)).unwrap();
+                            });
+                        }
+                        _ => {}
+                    },
+                    _ => {}
+                },
             };
 
             None
@@ -192,12 +218,31 @@ pub fn maybe_save_state(state: &App) -> Option<JoinHandle<()>> {
             maybe_filename.map(|filename| {
                 let mut file = File::create(&filename)
                     .expect(&format!("Error opening {}", &filename.to_str().unwrap()));
-                file.write_all(
-                    serde_json::to_string(&exam_copy)
-                        .expect("Error converting exam to json")
-                        .as_ref(),
-                )
-                .expect(&format!("Error writing {}", &filename.to_str().unwrap()));
+                match filename.extension() {
+                    Some(ext) => match ext.to_str() {
+                        Some("json") => file
+                            .write_all(
+                                serde_json::to_string(&exam_copy)
+                                    .expect("Error converting exam to json")
+                                    .as_ref(),
+                            )
+                            .expect(&format!("Error writing {}", &filename.to_str().unwrap())),
+                        Some("exhaust") | Some("gz") => {
+                            let mut encoder =
+                                Encoder::new(file).expect("Unable to initialize encoder");
+                            encoder
+                                .write_all(
+                                    serde_json::to_string(&exam_copy)
+                                        .expect("Error converting exam to json")
+                                        .as_ref(),
+                                )
+                                .expect("Unable to write to file");
+                            encoder.finish();
+                        }
+                        _ => {}
+                    },
+                    _ => {}
+                };
             });
         }))
     } else {

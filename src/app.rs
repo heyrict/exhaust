@@ -185,6 +185,7 @@ impl Home {
                         || match path.extension() {
                             Some(ext) => match ext.to_str() {
                                 Some("json") => true,
+                                Some("exhaust") | Some("gz") => true,
                                 _ => false,
                             },
                             _ => false,
