@@ -12,7 +12,6 @@
  *     - ItemWidget
  *       - QuestionWidget
  */
-use crossterm::event::KeyCode;
 use std::sync::mpsc;
 use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout, Rect};
@@ -120,45 +119,45 @@ impl<'a> HomeWidget<'a> {
         event: Messages,
         tx: mpsc::Sender<Messages>,
     ) -> Option<Messages> {
-        match event {
-            Messages::Input(keyevent) => match keyevent.code {
-                KeyCode::Enter => {
+        match &event {
+            Messages::Input(keyevent) => match keyevent {
+                key!(Enter) => {
                     tx.send(Messages::LoadFile).unwrap();
                     None
                 }
-                KeyCode::Char('j') | KeyCode::Down => {
+                key!('j') | key!(Down) => {
                     tx.send(Messages::UpdateHomeSelected(UpdateHomeSelectedEvent::Next))
                         .unwrap();
                     None
                 }
-                KeyCode::Char('k') | KeyCode::Up => {
+                key!('k') | key!(Up) => {
                     tx.send(Messages::UpdateHomeSelected(UpdateHomeSelectedEvent::Prev))
                         .unwrap();
                     None
                 }
-                KeyCode::Char('g') => {
+                key!('g') => {
                     tx.send(Messages::UpdateHomeSelected(UpdateHomeSelectedEvent::Home))
                         .unwrap();
                     None
                 }
-                KeyCode::Char('G') => {
+                key!('G') => {
                     tx.send(Messages::UpdateHomeSelected(UpdateHomeSelectedEvent::End))
                         .unwrap();
                     None
                 }
-                KeyCode::Char('u') => {
+                key!('u') => {
                     tx.send(Messages::LoadUpperDirectory).unwrap();
                     None
                 }
-                KeyCode::Char('r') => {
+                key!('r') => {
                     tx.send(Messages::SetOpenMode(OpenMode::ReadOnly)).unwrap();
                     None
                 }
-                KeyCode::Char('w') => {
+                key!('w') => {
                     tx.send(Messages::SetOpenMode(OpenMode::Write)).unwrap();
                     None
                 }
-                KeyCode::Char('q') => {
+                key!('q') => {
                     tx.send(Messages::Quit).unwrap();
                     None
                 }
@@ -209,12 +208,12 @@ impl<'a> ExamWidget<'a> {
 
     pub fn propagate(state: &App, event: Messages, tx: mpsc::Sender<Messages>) -> Option<Messages> {
         match &event {
-            Messages::Input(keyevent) => match keyevent.code {
-                KeyCode::Char('q') => {
+            Messages::Input(keyevent) => match keyevent {
+                key!('q') => {
                     tx.send(Messages::ChangeRoute(AppRoute::Home)).unwrap();
                     return None;
                 }
-                KeyCode::Char(' ') => {
+                key!(' ') => {
                     tx.send(Messages::ToggleExamResult).unwrap();
                     return None;
                 }
@@ -410,48 +409,48 @@ impl<'a> QuestionWidget<'a> {
 
     pub fn propagate(state: &App, event: Messages, tx: mpsc::Sender<Messages>) -> Option<Messages> {
         match event {
-            Messages::Input(keyevent) => match keyevent.code {
-                KeyCode::Char('a') | KeyCode::Char('A') => {
+            Messages::Input(keyevent) => match keyevent {
+                key!('a') | key!('A') => {
                     tx.send(Messages::ToggleSelection(SelectionFlags::A))
                         .unwrap();
                     None
                 }
-                KeyCode::Char('b') | KeyCode::Char('B') => {
+                key!('b') | key!('B') => {
                     tx.send(Messages::ToggleSelection(SelectionFlags::B))
                         .unwrap();
                     None
                 }
-                KeyCode::Char('c') | KeyCode::Char('C') => {
+                key!('c') | key!('C') => {
                     tx.send(Messages::ToggleSelection(SelectionFlags::C))
                         .unwrap();
                     None
                 }
-                KeyCode::Char('d') | KeyCode::Char('D') => {
+                key!('d') | key!('D') => {
                     tx.send(Messages::ToggleSelection(SelectionFlags::D))
                         .unwrap();
                     None
                 }
-                KeyCode::Char('e') | KeyCode::Char('E') => {
+                key!('e') | key!('E') => {
                     tx.send(Messages::ToggleSelection(SelectionFlags::E))
                         .unwrap();
                     None
                 }
-                KeyCode::Char('f') | KeyCode::Char('F') => {
+                key!('f') | key!('F') => {
                     tx.send(Messages::ToggleSelection(SelectionFlags::F))
                         .unwrap();
                     None
                 }
-                KeyCode::Char('g') | KeyCode::Char('G') => {
+                key!('g') | key!('G') => {
                     tx.send(Messages::ToggleSelection(SelectionFlags::G))
                         .unwrap();
                     None
                 }
-                KeyCode::Char('h') | KeyCode::Char('H') => {
+                key!('h') | key!('H') => {
                     tx.send(Messages::ToggleSelection(SelectionFlags::H))
                         .unwrap();
                     None
                 }
-                KeyCode::Char('j') => {
+                key!('j') => {
                     state.exam.as_ref().map(|exam: &Exam| {
                         tx.send(Messages::ScrollQuestion(
                             &exam.display.question_scroll_pos + 1,
@@ -460,7 +459,7 @@ impl<'a> QuestionWidget<'a> {
                     });
                     None
                 }
-                KeyCode::Char('k') => {
+                key!('k') => {
                     state.exam.as_ref().map(|exam: &Exam| {
                         let next_pos = match &exam.display.question_scroll_pos {
                             0 => 0,
@@ -607,15 +606,15 @@ impl<'a> ExamItemsWidget<'a> {
         tx: mpsc::Sender<Messages>,
     ) -> Option<Messages> {
         match event {
-            Messages::Input(keyevent) => match keyevent.code {
-                KeyCode::Char('>') | KeyCode::Char('n') => {
+            Messages::Input(keyevent) => match keyevent {
+                key!('>') | key!('n') => {
                     tx.send(Messages::UpdateQuestionIndex(
                         UpdateQuestionIndexEvent::Next,
                     ))
                     .unwrap();
                     None
                 }
-                KeyCode::Char('<') | KeyCode::Char('p') => {
+                key!('<') | key!('p') => {
                     tx.send(Messages::UpdateQuestionIndex(
                         UpdateQuestionIndexEvent::Prev,
                     ))
@@ -664,8 +663,8 @@ impl<'a> JumpBarWidget<'a> {
         let exam = state.exam.as_ref().unwrap();
         let jumpbox_value = exam.jumpbox_value;
         match event {
-            Messages::Input(keyevent) => match keyevent.code {
-                KeyCode::Char(c) => {
+            Messages::Input(keyevent) => match keyevent {
+                key!(Char(c)) => {
                     if c < '0' || c > '9' {
                         return Some(event);
                     };
@@ -678,7 +677,7 @@ impl<'a> JumpBarWidget<'a> {
                     }
                     None
                 }
-                KeyCode::Enter => {
+                key!(Enter) => {
                     // Do not handle Enter if Jumpbox is closed
                     if jumpbox_value == 0 {
                         return Some(event);
@@ -691,7 +690,7 @@ impl<'a> JumpBarWidget<'a> {
                     tx.send(Messages::UpdateJumpboxValue(0)).unwrap();
                     None
                 }
-                KeyCode::Backspace => {
+                key!(Backspace) => {
                     if jumpbox_value != 0 {
                         tx.send(Messages::UpdateJumpboxValue(jumpbox_value / 10))
                             .unwrap();
@@ -700,7 +699,7 @@ impl<'a> JumpBarWidget<'a> {
                         Some(event)
                     }
                 }
-                KeyCode::Esc => {
+                key!(Esc) => {
                     if jumpbox_value != 0 {
                         tx.send(Messages::UpdateJumpboxValue(0)).unwrap();
                         None

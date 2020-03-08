@@ -1,6 +1,9 @@
 #[macro_use]
 extern crate bitflags;
 
+#[macro_use]
+mod macros;
+
 mod app;
 mod event;
 mod reducer;
@@ -17,7 +20,6 @@ use event::Messages;
 use tui::widgets::{Block, Borders, Widget};
 
 use crossterm::{
-    event::{KeyCode, KeyEvent},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -60,11 +62,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         })?;
         let next_event = events.next()?;
         match next_event {
-            Messages::Input(KeyEvent {
-                code: KeyCode::Char('Q'),
-                ..
-            })
-            | Messages::Quit => {
+            Messages::Input(key!('Q')) | Messages::Quit => {
                 // Only saves when quitting from DoExam page
                 if let AppRoute::DoExam = &app.route {
                     let handle = maybe_save_state(&app);
