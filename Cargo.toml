@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 unicode-width = "0.1.5"
-crossterm = "0.14"
+crossterm = "0.16"
 bitflags = "^1.2"
 libflate = "^0.1"
 
