@@ -90,10 +90,12 @@ pub enum Item {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Exam {
     pub questions: Vec<Item>,
-    #[serde(default)]
+    #[serde(skip)]
     pub display: DoExamDisplay,
     #[serde(flatten)]
     pub extra: HashMap<String, serde_json::Value>,
+    #[serde(skip)]
+    pub jumpbox_value: u16,
 }
 
 #[derive(Clone, Debug)]
@@ -119,12 +121,6 @@ impl Default for DoExamDisplay {
             question_scroll_pos: 0,
             display_answer: false,
         }
-    }
-}
-
-impl DoExamDisplay {
-    pub fn set_index(&mut self, index: usize) {
-        self.question_index = index;
     }
 }
 

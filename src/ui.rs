@@ -1,3 +1,17 @@
+/*
+ * ui.rs
+ *
+ * The definition of terminal user interface.
+ *
+ * ## Structure
+ * - AppWidget
+ *   - HomeWidget
+ *   - ExamWidget
+ *     - JumpBarWidget
+ *     - ExamItemsWidget
+ *     - ItemWidget
+ *       - QuestionWidget
+ */
 use crossterm::event::KeyCode;
 use std::sync::mpsc;
 use tui::backend::Backend;
@@ -97,7 +111,7 @@ impl<'a> HomeWidget<'a> {
             )
             .select(self.app.home.current_selected)
             .highlight_symbol(">")
-            .highlight_style(Style::default().modifier(Modifier::REVERSED))
+            .highlight_style(Style::default().modifier(Modifier::REVERSED & Modifier::UNDERLINED))
             .render(frame, chunks[1]);
     }
 
@@ -174,7 +188,23 @@ impl<'a> ExamWidget<'a> {
             .split(content);
 
         ItemWidget::new(self.app).draw(frame, main_chunks[0]);
-        ExamItemsWidget::new(self.app).draw(frame, main_chunks[1]);
+
+        match self.app.exam.as_ref().unwrap().jumpbox_value {
+            // Do not display jumpbox if its value is zero.
+            0 => {
+                ExamItemsWidget::new(self.app).draw(frame, main_chunks[1]);
+            }
+            _ => {
+                let sidebar_chunks = Layout::default()
+                    .direction(Direction::Vertical)
+                    // Jumpbar and ExamItems
+                    .constraints([Constraint::Length(3), Constraint::Min(5)].as_ref())
+                    .split(main_chunks[1]);
+
+                JumpBarWidget::new(self.app).draw(frame, sidebar_chunks[0]);
+                ExamItemsWidget::new(self.app).draw(frame, sidebar_chunks[1]);
+            }
+        }
     }
 
     pub fn propagate(state: &App, event: Messages, tx: mpsc::Sender<Messages>) -> Option<Messages> {
@@ -193,6 +223,7 @@ impl<'a> ExamWidget<'a> {
             _ => {}
         };
         ExamItemsWidget::propagate(state, event, tx.clone())
+            .and_then(|event| JumpBarWidget::propagate(state, event, tx.clone()))
             .and_then(|event| ItemWidget::propagate(state, event, tx))
     }
 }
@@ -207,19 +238,14 @@ impl<'a> ItemWidget<'a> {
     }
 
     pub fn draw<B: Backend>(&mut self, frame: &mut Frame<B>, content: Rect) {
-        match &self.app.route {
-            AppRoute::DoExam => {
-                let exam = self.app.exam.as_ref().unwrap();
-                let item: &Item = exam
-                    .question_at(exam.display.question_index)
-                    .expect("Item out of range!");
+        let exam = self.app.exam.as_ref().unwrap();
+        let item: &Item = exam
+            .question_at(exam.display.question_index)
+            .expect("Item out of range!");
 
-                match item {
-                    Item::Question(question) => {
-                        QuestionWidget::new(self.app, &question, &exam.display).draw(frame, content)
-                    }
-                    _ => {}
-                }
+        match item {
+            Item::Question(question) => {
+                QuestionWidget::new(self.app, &question, &exam.display).draw(frame, content)
             }
             _ => {}
         }
@@ -595,6 +621,92 @@ impl<'a> ExamItemsWidget<'a> {
                     ))
                     .unwrap();
                     None
+                }
+                _ => Some(event),
+            },
+            _ => Some(event),
+        }
+    }
+}
+
+pub struct JumpBarWidget<'a> {
+    app: &'a App,
+}
+
+impl<'a> JumpBarWidget<'a> {
+    pub fn new(app: &'a App) -> Self {
+        JumpBarWidget { app }
+    }
+
+    pub fn draw<B: Backend>(&mut self, frame: &mut Frame<B>, content: Rect) {
+        const JUMPBOX_TEXT_STYLE: Style = Style {
+            fg: Color::Black,
+            bg: Color::Reset,
+            modifier: Modifier::UNDERLINED,
+        };
+
+        let sidebar_inner_length = self.app.config.items_per_line * 4 - 1;
+        let jumpbox_value = self.app.exam.as_ref().unwrap().jumpbox_value;
+        let jumpbox_text = [
+            Text::styled(
+                " ".repeat(sidebar_inner_length as usize - jumpbox_value.to_string().len()),
+                JUMPBOX_TEXT_STYLE,
+            ),
+            Text::styled(format!("{}", jumpbox_value), JUMPBOX_TEXT_STYLE),
+        ];
+
+        Paragraph::new(jumpbox_text.iter())
+            .block(Block::default().borders(Borders::ALL).title("Jump to"))
+            .render(frame, content);
+    }
+
+    pub fn propagate(state: &App, event: Messages, tx: mpsc::Sender<Messages>) -> Option<Messages> {
+        let exam = state.exam.as_ref().unwrap();
+        let jumpbox_value = exam.jumpbox_value;
+        match event {
+            Messages::Input(keyevent) => match keyevent.code {
+                KeyCode::Char(c) => {
+                    if c < '0' || c > '9' {
+                        return Some(event);
+                    };
+                    let next_value = jumpbox_value * 10 + c.to_digit(10)? as u16;
+                    if next_value > exam.num_questions() as u16 {
+                        tx.send(Messages::UpdateJumpboxValue(exam.num_questions() as u16))
+                            .unwrap();
+                    } else {
+                        tx.send(Messages::UpdateJumpboxValue(next_value)).unwrap();
+                    }
+                    None
+                }
+                KeyCode::Enter => {
+                    // Do not handle Enter if Jumpbox is closed
+                    if jumpbox_value == 0 {
+                        return Some(event);
+                    }
+
+                    tx.send(Messages::UpdateQuestionIndex(
+                        UpdateQuestionIndexEvent::Set(jumpbox_value as usize - 1),
+                    ))
+                    .unwrap();
+                    tx.send(Messages::UpdateJumpboxValue(0)).unwrap();
+                    None
+                }
+                KeyCode::Backspace => {
+                    if jumpbox_value != 0 {
+                        tx.send(Messages::UpdateJumpboxValue(jumpbox_value / 10))
+                            .unwrap();
+                        None
+                    } else {
+                        Some(event)
+                    }
+                }
+                KeyCode::Esc => {
+                    if jumpbox_value != 0 {
+                        tx.send(Messages::UpdateJumpboxValue(0)).unwrap();
+                        None
+                    } else {
+                        Some(event)
+                    }
                 }
                 _ => Some(event),
             },

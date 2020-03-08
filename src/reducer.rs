@@ -137,6 +137,12 @@ pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> O
             }
             _ => None,
         },
+        Messages::UpdateJumpboxValue(value) => {
+            state.exam.as_mut().map(|exam| {
+                exam.jumpbox_value = value;
+            });
+            None
+        }
         Messages::LoadFile => {
             let filename = state.home.get_selected_path()?;
             match filename.is_dir() {

@@ -29,6 +29,7 @@ pub enum Messages {
     UpdateQuestionIndex(UpdateQuestionIndexEvent),
     ScrollQuestion(u16),
     UpdateHomeSelected(UpdateHomeSelectedEvent),
+    UpdateJumpboxValue(u16),
     ToggleSelection(SelectionFlags),
     LoadFile,
     LoadUpperDirectory,
@@ -43,13 +44,13 @@ pub enum Messages {
 pub struct Events {
     pub tx: mpsc::Sender<Messages>,
     rx: mpsc::Receiver<Messages>,
-    input_handle: thread::JoinHandle<()>,
+    _input_handle: thread::JoinHandle<()>,
 }
 
 impl Events {
     pub fn new() -> Events {
         let (tx, rx) = mpsc::channel();
-        let input_handle = {
+        let _input_handle = {
             let tx = tx.clone();
             thread::spawn(move || loop {
                 if let Ok(event) = read() {
@@ -72,7 +73,7 @@ impl Events {
         Events {
             tx,
             rx,
-            input_handle,
+            _input_handle,
         }
     }
 
