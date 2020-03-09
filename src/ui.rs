@@ -336,6 +336,13 @@ impl<'a> QuestionWidget<'a> {
             &self.display.question_index + 1,
             &self.app.exam.as_ref().unwrap().num_questions()
         );
+        const WRAPPER_SELECT: [&str; 2] = ["(", ")"];
+        const WRAPPER_MULTSEL: [&str; 2] = ["[", "]"];
+        let current_wrapper = if self.question.num_should_selects() == 1usize {
+            WRAPPER_SELECT
+        } else {
+            WRAPPER_MULTSEL
+        };
 
         // Question + Selections
         let two_chunks = Layout::default()
@@ -384,7 +391,9 @@ impl<'a> QuestionWidget<'a> {
                     })
                     .collect();
 
-                ToggleButtons::new(selections_state).render(frame, two_chunks[1]);
+                ToggleButtons::new(selections_state)
+                    .wrapper(current_wrapper)
+                    .render(frame, two_chunks[1]);
             }
             true => {
                 // Question
@@ -425,7 +434,8 @@ impl<'a> QuestionWidget<'a> {
                         }
                     })
                     .collect();
-                let mut selections_block = ToggleButtons::new(selections_state);
+                let mut selections_block =
+                    ToggleButtons::new(selections_state).wrapper(current_wrapper);
 
                 // Answer
                 let answer = match self.question.answer.as_ref() {

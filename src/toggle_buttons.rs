@@ -20,6 +20,10 @@ pub struct ToggleButtons<'a> {
     borders: Borders,
     /// Border style
     border_style: Style,
+    /// Wrapper strings
+    wrapper: [&'a str; 2],
+    /// Marker string
+    marker: &'a str,
 }
 
 impl<'a> ToggleButtons<'a> {
@@ -31,11 +35,13 @@ impl<'a> ToggleButtons<'a> {
             state,
             borders: Borders::NONE,
             border_style: Default::default(),
+            wrapper: ["[", "]"],
+            marker: "x",
         }
     }
 
-    pub fn block(mut self, block: Block<'a>) -> ToggleButtons<'a> {
-        self.block = Some(block);
+    pub fn wrapper<'b: 'a>(mut self, wrapper: [&'b str; 2]) -> ToggleButtons<'a> {
+        self.wrapper = wrapper;
         self
     }
 }
@@ -135,14 +141,17 @@ impl<'a> Widget for ToggleButtons<'a> {
             .map(|(index, button_state)| {
                 let ToggleButtonState { text, selected } = button_state;
                 let selection_alphabetic = ('A' as u8 + index as u8) as char;
+                let [wl, wr] = self.wrapper;
                 if *selected {
+                    let checkbox = format!("{}{}{}", wl, self.marker, wr);
                     Text::styled(
-                        format!("[x]{}. {}\n", selection_alphabetic, text),
+                        format!("{}{}. {}\n", checkbox, selection_alphabetic, text),
                         self.selected_style,
                     )
                 } else {
+                    let checkbox = format!("{} {}", wl, wr);
                     Text::styled(
-                        format!("[ ]{}. {}\n", selection_alphabetic, text),
+                        format!("{}{}. {}\n", checkbox, selection_alphabetic, text),
                         self.style,
                     )
                 }
