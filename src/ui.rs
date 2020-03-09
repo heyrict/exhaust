@@ -16,7 +16,7 @@ use std::sync::mpsc;
 use tui::backend::Backend;
 use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
-use tui::widgets::{Block, Borders, Paragraph, SelectableList, Text, Widget};
+use tui::widgets::{Block, Borders, Gauge, Paragraph, SelectableList, Text, Widget};
 use tui::Frame;
 
 use crate::app::*;
@@ -64,9 +64,9 @@ impl<'a> HomeWidget<'a> {
             modifier: Modifier::UNDERLINED,
         };
         const HIGHLIGHT_STYLE: Style = Style {
-            fg: Color::Gray,
-            bg: Color::Black,
-            modifier: Modifier::empty(),
+            fg: Color::Magenta,
+            bg: Color::Reset,
+            modifier: Modifier::REVERSED,
         };
         const CURRENT_PATH_STYLE: Style = Style {
             fg: Color::Green,
@@ -136,7 +136,7 @@ impl<'a> HomeWidget<'a> {
             )
             .select(self.app.home.current_selected)
             .highlight_symbol(">")
-            .highlight_style(Style::default().modifier(Modifier::REVERSED & Modifier::UNDERLINED))
+            .highlight_style(Style::default().modifier(Modifier::REVERSED))
             .render(frame, chunks[1]);
     }
 
@@ -202,15 +202,70 @@ impl<'a> ExamWidget<'a> {
     pub fn draw<B: Backend>(&mut self, frame: &mut Frame<B>, content: Rect) {
         let sidebar_length = self.app.config.items_per_line * 4 + 1;
 
+        let main_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .margin(1)
+            // Title bar, progress bar and the rest
+            .constraints(
+                [
+                    Constraint::Length(1),
+                    Constraint::Length(1),
+                    Constraint::Min(10),
+                ]
+                .as_ref(),
+            )
+            .split(content);
+
+        // Title bar
+        let filepath = self.app.home.get_selected_path().unwrap();
+        let filename = filepath.file_stem().unwrap().to_str().unwrap();
+        let title = match self.app.home.open_mode {
+            OpenMode::ReadOnly => format!("{} [readonly]", &filename),
+            OpenMode::Write => format!("{} [write]", &filename),
+        };
+        Paragraph::new(
+            [Text::Styled(
+                title.into(),
+                Style::default().modifier(Modifier::BOLD),
+            )]
+            .iter(),
+        )
+        .style(Style::default().modifier(Modifier::REVERSED))
+        .alignment(Alignment::Center)
+        .render(frame, main_chunks[0]);
+
+        // Progress bar
+        let num_questions = self.app.exam.as_ref().unwrap().num_questions();
+        let num_answered = self
+            .app
+            .exam
+            .as_ref()
+            .unwrap()
+            .questions
+            .iter()
+            .filter(|item| match item {
+                Item::Question(question) => question.user_selection.is_empty(),
+                _ => false,
+            })
+            .collect::<Vec<&Item>>()
+            .len();
+        Gauge::default()
+            .ratio(1f64 - num_answered as f64 / num_questions as f64)
+            .style(
+                Style::default()
+                    .fg(Color::Rgb(147, 161, 161))
+                    .bg(Color::Rgb(238, 232, 213)),
+            )
+            .render(frame, main_chunks[1]);
+
         let main_chunks = match &self.app.config.show_usage {
             // Has usage footer
             true => {
                 let main_chunks = Layout::default()
                     .direction(Direction::Vertical)
-                    .margin(1)
                     // Main View and Sidebar
                     .constraints([Constraint::Min(10), Constraint::Length(1)].as_ref())
-                    .split(content);
+                    .split(main_chunks[2]);
 
                 let footer_messages: [Text; 1] = [Text::raw(
                     "Usage: [q: quit][a-h: toggle answer][space: toggle view]\
@@ -222,16 +277,14 @@ impl<'a> ExamWidget<'a> {
 
                 Layout::default()
                     .direction(Direction::Horizontal)
-                    .margin(0)
                     .constraints([Constraint::Min(30), Constraint::Length(sidebar_length)].as_ref())
                     .split(main_chunks[0])
             }
             // Has no usage footer
             false => Layout::default()
                 .direction(Direction::Horizontal)
-                .margin(1)
                 .constraints([Constraint::Min(30), Constraint::Length(sidebar_length)].as_ref())
-                .split(content),
+                .split(main_chunks[2]),
         };
 
         ItemWidget::new(self.app).draw(frame, main_chunks[0]);
