@@ -32,7 +32,6 @@ pub enum Messages {
     UpdateJumpboxValue(u16),
     ToggleSelection(SelectionFlags),
     LoadFile,
-    LoadUpperDirectory,
     FileLoaded(Exam),
     SetOpenMode(OpenMode),
     ToggleExamResult,

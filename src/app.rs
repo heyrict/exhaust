@@ -160,7 +160,7 @@ impl Default for Home {
         Home {
             exam_src: None,
             current_path: current_dir().expect("Unable to get current directory"),
-            current_selected: None,
+            current_selected: Some(0),
             open_mode: OpenMode::default(),
         }
     }

@@ -148,7 +148,7 @@ pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> O
             match filename.is_dir() {
                 true => {
                     state.home.current_path = filename.to_path_buf();
-                    state.home.current_selected = None;
+                    state.home.current_selected = Some(0);
                 }
                 false => match filename.extension() {
                     Some(ext) => match ext.to_str() {
@@ -191,16 +191,6 @@ pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> O
                 },
             };
 
-            None
-        }
-        Messages::LoadUpperDirectory => {
-            match state.home.current_path.parent() {
-                Some(parent) => {
-                    state.home.current_path = parent.to_path_buf();
-                    state.home.current_selected = None;
-                }
-                None => {}
-            };
             None
         }
         Messages::SetOpenMode(mode) => {

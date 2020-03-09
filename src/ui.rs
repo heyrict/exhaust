@@ -79,12 +79,10 @@ impl<'a> HomeWidget<'a> {
             Text::raw("Welcome! Choose a file to start:\n\nCurrent Path: "),
             Text::styled(pwd, CURRENT_PATH_STYLE),
         ];
-        let footer_messages: [Text; 9] = [
+        let footer_messages: [Text; 7] = [
             Text::raw("["),
             Text::styled("q", UNDERLINE_STYLE),
             Text::raw(": Quit] | ["),
-            Text::styled("u", UNDERLINE_STYLE),
-            Text::raw(": Upper] | ["),
             match self.app.home.open_mode {
                 OpenMode::ReadOnly => Text::styled("ReadOnly", HIGHLIGHT_STYLE),
                 OpenMode::Write => Text::styled("ReadOnly", Style::default()),
@@ -171,10 +169,6 @@ impl<'a> HomeWidget<'a> {
                 key!('G') => {
                     tx.send(Messages::UpdateHomeSelected(UpdateHomeSelectedEvent::End))
                         .unwrap();
-                    None
-                }
-                key!('u') => {
-                    tx.send(Messages::LoadUpperDirectory).unwrap();
                     None
                 }
                 key!('r') => {
