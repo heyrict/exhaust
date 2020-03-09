@@ -191,6 +191,10 @@ impl Home {
                 })
                 .collect();
             paths.sort();
+
+            &self.current_path.parent().map(|parent_dir| {
+                paths.insert(0, parent_dir.into());
+            });
             paths
         })
     }

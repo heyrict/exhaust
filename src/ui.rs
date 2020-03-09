@@ -68,9 +68,19 @@ impl<'a> HomeWidget<'a> {
             bg: Color::Black,
             modifier: Modifier::empty(),
         };
+        const CURRENT_PATH_STYLE: Style = Style {
+            fg: Color::Green,
+            bg: Color::Reset,
+            modifier: Modifier::BOLD,
+        };
 
-        let messages: [Text; 9] = [
-            Text::raw("Welcome! Choose a file to start:\n\n["),
+        let pwd = self.app.home.current_path.to_str().unwrap_or("???");
+        let welcome_messages: [Text; 2] = [
+            Text::raw("Welcome! Choose a file to start:\n\nCurrent Path: "),
+            Text::styled(pwd, CURRENT_PATH_STYLE),
+        ];
+        let footer_messages: [Text; 9] = [
+            Text::raw("["),
             Text::styled("q", UNDERLINE_STYLE),
             Text::raw(": Quit] | ["),
             Text::styled("u", UNDERLINE_STYLE),
@@ -89,21 +99,39 @@ impl<'a> HomeWidget<'a> {
         let paths = self.app.home.get_paths().unwrap();
         let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(5), Constraint::Min(6)].as_ref())
+            .constraints(
+                [
+                    Constraint::Length(5),
+                    Constraint::Min(6),
+                    Constraint::Length(2),
+                ]
+                .as_ref(),
+            )
             .margin(1)
             .split(content);
-        let _welcome = Paragraph::new(messages.iter())
+        let _welcome = Paragraph::new(welcome_messages.iter())
             .block(Block::default().borders(Borders::ALL))
             .render(frame, chunks[0]);
+        let _footer = Paragraph::new(footer_messages.iter())
+            .block(Block::default().borders(Borders::TOP))
+            .render(frame, chunks[2]);
+        let parent_dir = self.app.home.current_path.parent();
         let _items = SelectableList::default()
             .items(
                 &paths
                     .iter()
                     .map(|path| {
-                        let path_str = path.to_str().unwrap_or("???");
+                        if parent_dir.map(|pd| path == pd).unwrap_or(false) {
+                            return "../".to_owned();
+                        };
+
+                        let filename = path
+                            .file_name()
+                            .and_then(|filename| filename.to_str())
+                            .unwrap_or("???");
                         match path.is_dir() {
-                            true => format!("{}/", path_str),
-                            false => path_str.to_owned(),
+                            true => format!("{}/", filename),
+                            false => filename.to_owned(),
                         }
                     })
                     .collect::<Vec<String>>(),
