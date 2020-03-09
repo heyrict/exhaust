@@ -113,7 +113,6 @@ pub enum QuestionResult {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DoExamDisplay {
     pub question_index: usize,
-    #[serde(skip)]
     pub question_scroll_pos: u16,
     pub display_answer: bool,
 }
