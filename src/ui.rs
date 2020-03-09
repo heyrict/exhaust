@@ -201,27 +201,39 @@ impl<'a> ExamWidget<'a> {
 
     pub fn draw<B: Backend>(&mut self, frame: &mut Frame<B>, content: Rect) {
         let sidebar_length = self.app.config.items_per_line * 4 + 1;
-        let outer_chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .margin(1)
-            // Main View and Sidebar
-            .constraints([Constraint::Min(10), Constraint::Length(1)].as_ref())
-            .split(content);
-        let main_chunks = Layout::default()
-            .direction(Direction::Horizontal)
-            .margin(0)
-            // Main View and Sidebar
-            .constraints([Constraint::Min(30), Constraint::Length(sidebar_length)].as_ref())
-            .split(outer_chunks[0]);
 
-        let footer_messages: [Text; 1] = [Text::raw(
-            "Usage: [q: quit][a-h: toggle answer][space: toggle view]\
+        let main_chunks = match &self.app.config.show_usage {
+            // Has usage footer
+            true => {
+                let main_chunks = Layout::default()
+                    .direction(Direction::Vertical)
+                    .margin(1)
+                    // Main View and Sidebar
+                    .constraints([Constraint::Min(10), Constraint::Length(1)].as_ref())
+                    .split(content);
+
+                let footer_messages: [Text; 1] = [Text::raw(
+                    "Usage: [q: quit][a-h: toggle answer][space: toggle view]\
             [0-9: goto][n,p: change page]",
-        )];
+                )];
+                Paragraph::new(footer_messages.iter())
+                    .alignment(Alignment::Center)
+                    .render(frame, main_chunks[1]);
 
-        Paragraph::new(footer_messages.iter())
-            .alignment(Alignment::Center)
-            .render(frame, outer_chunks[1]);
+                Layout::default()
+                    .direction(Direction::Horizontal)
+                    .margin(0)
+                    .constraints([Constraint::Min(30), Constraint::Length(sidebar_length)].as_ref())
+                    .split(main_chunks[0])
+            }
+            // Has no usage footer
+            false => Layout::default()
+                .direction(Direction::Horizontal)
+                .margin(1)
+                .constraints([Constraint::Min(30), Constraint::Length(sidebar_length)].as_ref())
+                .split(content),
+        };
+
         ItemWidget::new(self.app).draw(frame, main_chunks[0]);
 
         match self.app.exam.as_ref().unwrap().jumpbox_value {
