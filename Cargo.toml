@@ -5,6 +5,7 @@ authors = ["heyrict <xiezh0831@yahoo.co.jp>"]
 edition = "2018"
 
 [dependencies]
+dirs = "^2.0"
 unicode-width = "0.1.5"
 crossterm = "0.16"
 bitflags = "^1.2"

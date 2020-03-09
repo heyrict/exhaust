@@ -1,8 +1,12 @@
+use dirs::config_dir;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env::current_dir;
-use std::fs::read_dir;
+use std::fs::{read_dir, File};
+use std::io;
 use std::path::PathBuf;
+
+const DEFAULT_CONFIG_FILENAME: &str = "exhaust.json";
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Selection {
@@ -200,13 +204,29 @@ impl Home {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Config {
+    #[serde(default = "Config::_default_items_per_line")]
     pub items_per_line: u16,
+    #[serde(default = "Config::_default_show_usage")]
+    pub show_usage: bool,
+}
+
+impl Config {
+    const fn _default_show_usage() -> bool {
+        true
+    }
+    const fn _default_items_per_line() -> u16 {
+        5
+    }
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { items_per_line: 5 }
+        Self {
+            items_per_line: Self::_default_items_per_line(),
+            show_usage: Self::_default_show_usage(),
+        }
     }
 }
 
@@ -216,6 +236,38 @@ pub struct App {
     pub exam: Option<Exam>,
     pub home: Home,
     pub config: Config,
+}
+
+impl App {
+    pub fn load_config(&mut self) -> Result<(), io::Error> {
+        // Get config path
+        let mut config_path = config_dir().ok_or(io::Error::new(
+            io::ErrorKind::NotFound,
+            "Config directory not found",
+        ))?;
+        config_path.push(DEFAULT_CONFIG_FILENAME);
+        match config_path.exists() {
+            true => {
+                let file = File::open(&config_path)?;
+                self.config = serde_json::from_reader(&file)?;
+                Ok(())
+            }
+            false => {
+                let file = File::create(&config_path).map_err(|_| {
+                    io::Error::new(
+                        io::ErrorKind::Other,
+                        format!("Error opening {}", &config_path.to_str().unwrap()),
+                    )
+                })?;
+                serde_json::to_writer_pretty(&file, &self.config).map_err(|_| {
+                    io::Error::new(
+                        io::ErrorKind::Other,
+                        format!("Error writing to {}", &config_path.to_str().unwrap()),
+                    )
+                })
+            }
+        }
+    }
 }
 
 impl Exam {

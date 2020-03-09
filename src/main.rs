@@ -40,6 +40,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     terminal.hide_cursor()?;
 
     let mut app = App::default();
+    app.load_config()?;
 
     terminal.clear()?;
 

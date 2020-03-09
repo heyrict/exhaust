@@ -2,7 +2,7 @@ use crate::app::*;
 use crate::event::*;
 use libflate::gzip::{Decoder, Encoder};
 use std::fs::File;
-use std::io::{Read, Write};
+use std::io::Read;
 use std::sync::mpsc;
 use std::thread;
 use std::thread::JoinHandle;
@@ -212,26 +212,16 @@ pub fn maybe_save_state(state: &App) -> Option<JoinHandle<()>> {
         let maybe_filename = state.home.get_selected_path();
         Some(thread::spawn(move || {
             maybe_filename.map(|filename| {
-                let mut file = File::create(&filename)
+                let file = File::create(&filename)
                     .expect(&format!("Error opening {}", &filename.to_str().unwrap()));
                 match filename.extension() {
                     Some(ext) => match ext.to_str() {
-                        Some("json") => file
-                            .write_all(
-                                serde_json::to_string(&exam_copy)
-                                    .expect("Error converting exam to json")
-                                    .as_ref(),
-                            )
+                        Some("json") => serde_json::to_writer(&file, &exam_copy)
                             .expect(&format!("Error writing {}", &filename.to_str().unwrap())),
                         Some("exhaust") | Some("gz") => {
                             let mut encoder =
                                 Encoder::new(file).expect("Unable to initialize encoder");
-                            encoder
-                                .write_all(
-                                    serde_json::to_string(&exam_copy)
-                                        .expect("Error converting exam to json")
-                                        .as_ref(),
-                                )
+                            serde_json::to_writer(&mut encoder, &exam_copy)
                                 .expect("Unable to write to file");
                             encoder.finish();
                         }
