@@ -205,12 +205,12 @@ impl<'a> ExamWidget<'a> {
         let main_chunks = Layout::default()
             .direction(Direction::Vertical)
             .margin(1)
-            // Title bar, progress bar and the rest
+            // Title bar, the rest, and progress bar
             .constraints(
                 [
                     Constraint::Length(1),
-                    Constraint::Length(1),
                     Constraint::Min(10),
+                    Constraint::Length(1),
                 ]
                 .as_ref(),
             )
@@ -256,7 +256,7 @@ impl<'a> ExamWidget<'a> {
                     .fg(Color::Rgb(147, 161, 161))
                     .bg(Color::Rgb(238, 232, 213)),
             )
-            .render(frame, main_chunks[1]);
+            .render(frame, main_chunks[2]);
 
         let main_chunks = match &self.app.config.show_usage {
             // Has usage footer
@@ -265,7 +265,7 @@ impl<'a> ExamWidget<'a> {
                     .direction(Direction::Vertical)
                     // Main View and Sidebar
                     .constraints([Constraint::Min(10), Constraint::Length(1)].as_ref())
-                    .split(main_chunks[2]);
+                    .split(main_chunks[1]);
 
                 let footer_messages: [Text; 1] = [Text::raw(
                     "Usage: [q: quit][a-h: toggle answer][space: toggle view]\
@@ -284,7 +284,7 @@ impl<'a> ExamWidget<'a> {
             false => Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([Constraint::Min(30), Constraint::Length(sidebar_length)].as_ref())
-                .split(main_chunks[2]),
+                .split(main_chunks[1]),
         };
 
         ItemWidget::new(self.app).draw(frame, main_chunks[0]);
