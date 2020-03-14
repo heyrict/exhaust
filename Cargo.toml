@@ -1,6 +1,6 @@
 [package]
 name = "exhaust"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["heyrict <xiezh0831@yahoo.co.jp>"]
 edition = "2018"
 
