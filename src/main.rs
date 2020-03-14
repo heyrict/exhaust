@@ -12,12 +12,11 @@ mod ui;
 mod widget;
 
 use app::*;
-use reducer::maybe_save_state;
 
 use std::error::Error;
 
 use event::Messages;
-use tui::widgets::{Block, Borders, Widget};
+use tui::widgets::{Block, Borders};
 
 use crossterm::{
     execute,
@@ -45,13 +44,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     terminal.clear()?;
 
     loop {
-        let mut app_widget = ui::AppWidget::new(&app);
+        let mut app_widget = ui::AppWidget::new(&mut app);
         terminal.draw(|mut f| {
             let size = f.size();
-            Block::default()
-                .title("EXHAUST")
-                .borders(Borders::ALL)
-                .render(&mut f, size);
+            f.render_widget(
+                Block::default().title("EXHAUST").borders(Borders::ALL),
+                size,
+            );
 
             let main_size = f.size();
             //main_size.y += 1;
@@ -64,13 +63,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         let next_event = events.next()?;
         match next_event {
             Messages::Input(key!('Q')) | Messages::Quit => {
-                // Only saves when quitting from DoExam page
-                if let AppRoute::DoExam = &app.route {
-                    let handle = maybe_save_state(&app);
-
-                    // Wait for saving thread to finish
-                    handle.map(|hdl| hdl.join().ok());
-                }
                 disable_raw_mode()?;
                 execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
                 terminal.show_cursor()?;

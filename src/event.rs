@@ -22,6 +22,13 @@ pub enum UpdateHomeSelectedEvent {
 }
 
 #[derive(Debug)]
+pub enum ModalActions {
+    Open,
+    Okay,
+    Cancel,
+}
+
+#[derive(Debug)]
 pub enum Messages {
     Input(KeyEvent),
     Resize,
@@ -32,6 +39,8 @@ pub enum Messages {
     UpdateJumpboxValue(u16),
     ToggleSelection(SelectionFlags),
     LoadFile,
+    ModalAction(ModalActions),
+    UnsavedChanges(bool),
     FileLoaded(Exam),
     SetOpenMode(OpenMode),
     ToggleExamResult,

@@ -47,10 +47,10 @@ impl<'a> ToggleButtons<'a> {
 }
 
 impl<'a> Widget for ToggleButtons<'a> {
-    fn draw(&mut self, textbox_area: Rect, buf: &mut Buffer) {
+    fn render(mut self, textbox_area: Rect, buf: &mut Buffer) {
         let textbox_area = match self.block {
             Some(ref mut b) => {
-                b.draw(textbox_area, buf);
+                b.render(textbox_area, buf);
                 b.inner(textbox_area)
             }
             None => textbox_area,
@@ -59,7 +59,7 @@ impl<'a> Widget for ToggleButtons<'a> {
             return;
         }
 
-        self.background(textbox_area, buf, self.style.bg);
+        buf.set_background(textbox_area, self.style.bg);
 
         // Sides
         if self.borders.intersects(Borders::LEFT) {
@@ -164,6 +164,8 @@ impl<'a> Widget for ToggleButtons<'a> {
             textbox_width,
             textbox_height,
         );
-        Paragraph::new(texts.iter()).wrap(true).draw(para_rect, buf);
+        Paragraph::new(texts.iter())
+            .wrap(true)
+            .render(para_rect, buf);
     }
 }

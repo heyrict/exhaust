@@ -5,6 +5,7 @@ use std::env::current_dir;
 use std::fs::{read_dir, File};
 use std::io;
 use std::path::PathBuf;
+use tui::widgets::ListState;
 
 const DEFAULT_CONFIG_FILENAME: &str = "exhaust.json";
 
@@ -100,6 +101,8 @@ pub struct Exam {
     pub extra: HashMap<String, serde_json::Value>,
     #[serde(skip)]
     pub jumpbox_value: u16,
+    #[serde(skip)]
+    pub unsaved_changes: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -154,7 +157,7 @@ impl Default for OpenMode {
 pub struct Home {
     pub exam_src: Option<PathBuf>,
     pub current_path: PathBuf,
-    pub current_selected: Option<usize>,
+    pub list_state: ListState,
     pub open_mode: OpenMode,
 }
 
@@ -163,7 +166,7 @@ impl Default for Home {
         Home {
             exam_src: None,
             current_path: current_dir().expect("Unable to get current directory"),
-            current_selected: Some(0),
+            list_state: ListState::default(),
             open_mode: OpenMode::default(),
         }
     }
@@ -173,7 +176,7 @@ impl Home {
     pub fn get_selected_path(&self) -> Option<PathBuf> {
         let paths = self.get_paths().ok()?;
         paths
-            .get(self.current_selected?)
+            .get(self.list_state.selected()?)
             .map(|path| path.to_path_buf())
     }
 
@@ -200,6 +203,18 @@ impl Home {
             });
             paths
         })
+    }
+}
+
+pub struct Modal {
+    pub show_save_model: bool,
+}
+
+impl Default for Modal {
+    fn default() -> Modal {
+        Modal {
+            show_save_model: false,
+        }
     }
 }
 
@@ -240,6 +255,7 @@ pub struct App {
     pub route: AppRoute,
     pub exam: Option<Exam>,
     pub home: Home,
+    pub modal: Modal,
     pub config: Config,
 }
 

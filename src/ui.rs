@@ -11,12 +11,13 @@
  *     - ExamItemsWidget
  *     - ItemWidget
  *       - QuestionWidget
+ *   - SaveModalWidget
  */
 use std::sync::mpsc;
 use tui::backend::Backend;
 use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
-use tui::widgets::{Block, Borders, Gauge, Paragraph, SelectableList, Text, Widget};
+use tui::widgets::{Block, Borders, Gauge, List, Paragraph, Text};
 use tui::Frame;
 
 use crate::app::*;
@@ -24,36 +25,164 @@ use crate::event::*;
 use crate::toggle_buttons::*;
 
 pub struct AppWidget<'a> {
-    app: &'a App,
+    app: &'a mut App,
 }
 
 impl<'a> AppWidget<'a> {
-    pub fn new(app: &'a App) -> Self {
+    pub fn new(app: &'a mut App) -> Self {
         AppWidget { app }
     }
 
     pub fn draw<B: Backend>(&mut self, frame: &mut Frame<B>, content: Rect) {
+        // The main view
         match &self.app.route {
             AppRoute::Home => HomeWidget::new(self.app).draw(frame, content),
             AppRoute::DoExam => ExamWidget::new(self.app).draw(frame, content),
         };
+
+        // Overlay modals
+        if self.app.modal.show_save_model {
+            let filename = self.app.home.get_selected_path().unwrap();
+            let save_modal_message = format!("Save changes to \"{}\"?", filename.to_str().unwrap());
+
+            SaveModalWidget::new(self.app, &save_modal_message).draw(frame, content);
+        }
     }
 
     pub fn propagate(state: &App, event: Messages, tx: mpsc::Sender<Messages>) -> Option<Messages> {
         // Propagation
-        match state.route {
+        match event {
+            Messages::Input(key!(^'s')) => {
+                tx.send(Messages::ModalAction(ModalActions::Open)).unwrap();
+                None
+            }
+            _ => Some(event),
+        }
+        .and_then(|event| match &state.modal.show_save_model {
+            true => SaveModalWidget::propagate(state, event, tx.clone()),
+            false => Some(event),
+        })
+        .and_then(|event| match state.route {
             AppRoute::Home => HomeWidget::propagate(state, event, tx),
             AppRoute::DoExam => ExamWidget::propagate(state, event, tx),
-        }
+        })
+    }
+}
+
+pub struct SaveModalWidget<'a> {
+    _app: &'a App,
+    text: &'a str,
+}
+
+impl<'a> SaveModalWidget<'a> {
+    pub fn new(app: &'a App, text: &'a str) -> Self {
+        SaveModalWidget { _app: app, text }
+    }
+
+    pub fn draw<B: Backend>(&mut self, frame: &mut Frame<B>, content: Rect) {
+        const BG_STYLE: Style = Style {
+            fg: Color::Reset,
+            bg: Color::Gray,
+            modifier: Modifier::empty(),
+        };
+        const BUTTON_STYLE: Style = Style {
+            fg: Color::White,
+            bg: Color::Magenta,
+            modifier: Modifier::empty(),
+        };
+        const BTN_WIDTH: u16 = 8;
+
+        // When the terminal is at least 30x10 large, set paddings
+        // around the modal.
+        let padding_x = if content.width > 30 {
+            (content.width - 30) / 5
+        } else {
+            0
+        };
+        let padding_y = if content.height > 10 {
+            (content.height - 10) / 3
+        } else {
+            0
+        };
+        let inner_width = content.width - padding_x * 2 - 2;
+        let btn_pad_around = (inner_width - BTN_WIDTH * 2) / 3;
+
+        let layout = Layout::default()
+            .vertical_margin(padding_y)
+            .horizontal_margin(padding_x)
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Min(6), Constraint::Length(2)].as_ref())
+            .split(content);
+
+        let description_texts = [Text::raw(self.text)];
+        frame.render_widget(
+            Paragraph::new(description_texts.iter())
+                .wrap(true)
+                .alignment(Alignment::Center)
+                .block(
+                    Block::default()
+                        .clean(true)
+                        .borders(Borders::LEFT | Borders::RIGHT | Borders::TOP)
+                        .border_style(BG_STYLE),
+                )
+                .style(BG_STYLE),
+            layout[0],
+        );
+
+        let pad_text = Text::raw(" ".repeat(btn_pad_around as usize));
+        let btn_group = [
+            &pad_text,
+            &Text::styled("  ", BUTTON_STYLE),
+            &Text::styled("O", BUTTON_STYLE.modifier(Modifier::UNDERLINED)),
+            &Text::styled("  K  ", BUTTON_STYLE),
+            &pad_text,
+            &Text::styled(" ", BUTTON_STYLE),
+            &Text::styled("C", BUTTON_STYLE.modifier(Modifier::UNDERLINED)),
+            &Text::styled("ANCEL ", BUTTON_STYLE),
+            &pad_text,
+        ];
+
+        frame.render_widget(
+            Paragraph::new(btn_group.iter().map(|txt| *txt))
+                .block(
+                    Block::default()
+                        .clean(true)
+                        .borders(Borders::LEFT | Borders::RIGHT | Borders::BOTTOM)
+                        .border_style(BG_STYLE),
+                )
+                .style(BG_STYLE),
+            layout[1],
+        );
+    }
+
+    pub fn propagate(
+        _state: &App,
+        event: Messages,
+        tx: mpsc::Sender<Messages>,
+    ) -> Option<Messages> {
+        match event {
+            Messages::Input(keyevent) => match keyevent {
+                key!('o') | key!('O') => {
+                    tx.send(Messages::ModalAction(ModalActions::Okay)).unwrap();
+                }
+                key!('c') | key!('C') | key!(Esc) => {
+                    tx.send(Messages::ModalAction(ModalActions::Cancel))
+                        .unwrap();
+                }
+                _ => {}
+            },
+            _ => {}
+        };
+        None // Blocks all other inputs
     }
 }
 
 pub struct HomeWidget<'a> {
-    app: &'a App,
+    app: &'a mut App,
 }
 
 impl<'a> HomeWidget<'a> {
-    pub fn new(app: &'a App) -> Self {
+    pub fn new(app: &'a mut App) -> Self {
         HomeWidget { app }
     }
 
@@ -113,37 +242,33 @@ impl<'a> HomeWidget<'a> {
             )
             .margin(1)
             .split(content);
-        let _welcome = Paragraph::new(welcome_messages.iter())
-            .block(Block::default().borders(Borders::ALL))
-            .render(frame, chunks[0]);
-        let _footer = Paragraph::new(footer_messages.iter())
-            .block(Block::default().borders(Borders::TOP))
-            .render(frame, chunks[2]);
+        let _welcome = frame.render_widget(
+            Paragraph::new(welcome_messages.iter()).block(Block::default().borders(Borders::ALL)),
+            chunks[0],
+        );
+        let _footer = frame.render_widget(
+            Paragraph::new(footer_messages.iter()).block(Block::default().borders(Borders::TOP)),
+            chunks[2],
+        );
         let parent_dir = self.app.home.current_path.parent();
-        let _items = SelectableList::default()
-            .items(
-                &paths
-                    .iter()
-                    .map(|path| {
-                        if parent_dir.map(|pd| path == pd).unwrap_or(false) {
-                            return "../".to_owned();
-                        };
+        let list_items = paths.iter().map(|path| {
+            if parent_dir.map(|pd| path == pd).unwrap_or(false) {
+                return Text::raw("../".to_owned());
+            };
 
-                        let filename = path
-                            .file_name()
-                            .and_then(|filename| filename.to_str())
-                            .unwrap_or("???");
-                        match path.is_dir() {
-                            true => format!("{}/", filename),
-                            false => filename.to_owned(),
-                        }
-                    })
-                    .collect::<Vec<String>>(),
-            )
-            .select(self.app.home.current_selected)
+            let filename = path
+                .file_name()
+                .and_then(|filename| filename.to_str())
+                .unwrap_or("???");
+            Text::raw(match path.is_dir() {
+                true => format!("{}/", filename),
+                false => filename.to_owned(),
+            })
+        });
+        let list_widget = List::new(list_items)
             .highlight_symbol(">")
-            .highlight_style(Style::default().modifier(Modifier::REVERSED))
-            .render(frame, chunks[1]);
+            .highlight_style(Style::default().modifier(Modifier::REVERSED));
+        frame.render_stateful_widget(list_widget, chunks[1], &mut self.app.home.list_state);
     }
 
     pub fn propagate(state: &App, event: Messages, tx: mpsc::Sender<Messages>) -> Option<Messages> {
@@ -204,6 +329,7 @@ impl<'a> ExamWidget<'a> {
 
     pub fn draw<B: Backend>(&mut self, frame: &mut Frame<B>, content: Rect) {
         let sidebar_length = self.app.config.items_per_line * 4 + 1;
+        let exam = self.app.exam.as_ref().unwrap();
 
         let main_chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -222,44 +348,50 @@ impl<'a> ExamWidget<'a> {
         // Title bar
         let filepath = self.app.home.get_selected_path().unwrap();
         let filename = filepath.file_stem().unwrap().to_str().unwrap();
-        let title = match self.app.home.open_mode {
-            OpenMode::NoAutoSave => format!("{}", &filename),
-            OpenMode::AutoSave => format!("{} [autosave]", &filename),
+
+        let title = match exam.unsaved_changes {
+            true => format!("{}[+]", &filename),
+            false => filename.to_owned(),
         };
-        Paragraph::new(
-            [Text::Styled(
-                title.into(),
-                Style::default().modifier(Modifier::BOLD),
-            )]
-            .iter(),
-        )
-        .style(Style::default().modifier(Modifier::REVERSED))
-        .alignment(Alignment::Center)
-        .render(frame, main_chunks[0]);
+        let title = match self.app.home.open_mode {
+            OpenMode::NoAutoSave => format!("{}", &title),
+            OpenMode::AutoSave => format!("{} [autosave]", &title),
+        };
+
+        frame.render_widget(
+            Paragraph::new(
+                [Text::Styled(
+                    title.into(),
+                    Style::default().modifier(Modifier::BOLD),
+                )]
+                .iter(),
+            )
+            .style(Style::default().modifier(Modifier::REVERSED))
+            .alignment(Alignment::Center),
+            main_chunks[0],
+        );
 
         // Progress bar
-        let num_questions = self.app.exam.as_ref().unwrap().num_questions();
-        let num_answered = self
-            .app
-            .exam
-            .as_ref()
-            .unwrap()
-            .questions
-            .iter()
-            .filter(|item| match item {
-                Item::Question(question) => question.user_selection.is_empty(),
-                _ => false,
-            })
-            .collect::<Vec<&Item>>()
-            .len();
-        Gauge::default()
-            .ratio(1f64 - num_answered as f64 / num_questions as f64)
-            .style(
-                Style::default()
-                    .fg(Color::Rgb(147, 161, 161))
-                    .bg(Color::Rgb(238, 232, 213)),
-            )
-            .render(frame, main_chunks[2]);
+        let progress_bar = {
+            let num_questions = exam.num_questions();
+            let num_answered = exam
+                .questions
+                .iter()
+                .filter(|item| match item {
+                    Item::Question(question) => question.user_selection.is_empty(),
+                    _ => false,
+                })
+                .collect::<Vec<&Item>>()
+                .len();
+            Gauge::default()
+                .ratio(1f64 - num_answered as f64 / num_questions as f64)
+                .style(
+                    Style::default()
+                        .fg(Color::Rgb(147, 161, 161))
+                        .bg(Color::Rgb(238, 232, 213)),
+                )
+        };
+        frame.render_widget(progress_bar, main_chunks[2]);
 
         let main_chunks = match &self.app.config.show_usage {
             // Has usage footer
@@ -270,13 +402,18 @@ impl<'a> ExamWidget<'a> {
                     .constraints([Constraint::Min(10), Constraint::Length(1)].as_ref())
                     .split(main_chunks[1]);
 
-                let footer_messages: [Text; 1] = [Text::raw(
-                    "Usage: [q: quit][a-h: toggle answer][space: toggle view]\
-            [0-9: goto][n,p: change page]",
-                )];
-                Paragraph::new(footer_messages.iter())
-                    .alignment(Alignment::Center)
-                    .render(frame, main_chunks[1]);
+                frame.render_widget(
+                    Paragraph::new(
+                        [Text::raw(
+                            "Usage: [q: quit][a-h: toggle answer]\
+                                    [space: toggle view][0-9: goto]\
+                                    [n,p: change page][^s: save]",
+                        )]
+                        .iter(),
+                    )
+                    .alignment(Alignment::Center),
+                    main_chunks[1],
+                );
 
                 Layout::default()
                     .direction(Direction::Horizontal)
@@ -292,7 +429,7 @@ impl<'a> ExamWidget<'a> {
 
         ItemWidget::new(self.app).draw(frame, main_chunks[0]);
 
-        match self.app.exam.as_ref().unwrap().jumpbox_value {
+        match exam.jumpbox_value {
             // Do not display jumpbox if its value is zero.
             0 => {
                 ExamItemsWidget::new(self.app).draw(frame, main_chunks[1]);
@@ -421,40 +558,42 @@ impl<'a> QuestionWidget<'a> {
         match self.app.exam.as_ref().unwrap().display.display_answer {
             false => {
                 // Question
-                Paragraph::new([Text::raw(&self.question.question)].iter())
-                    .block(
-                        Block::default()
-                            .borders(Borders::ALL)
-                            .title(&question_title),
-                    )
-                    .wrap(true)
-                    .scroll(self.display.question_scroll_pos)
-                    .render(frame, two_chunks[0]);
+                frame.render_widget(
+                    Paragraph::new([Text::raw(&self.question.question)].iter())
+                        .block(
+                            Block::default()
+                                .borders(Borders::ALL)
+                                .title(&question_title),
+                        )
+                        .wrap(true)
+                        .scroll(self.display.question_scroll_pos),
+                    two_chunks[0],
+                );
 
                 // Selections
-                let selections_state = self
-                    .question
-                    .selections
-                    .iter()
-                    .enumerate()
-                    .take(8)
-                    .map(|(index, sel)| {
-                        let selection_flag: u8 = 0b1 << index;
-                        ToggleButtonState {
-                            text: sel.text.clone(),
-                            selected: self.question.user_selection.is_selected(selection_flag),
-                        }
-                    })
-                    .collect();
-
-                ToggleButtons::new(selections_state)
-                    .wrapper(current_wrapper)
-                    .render(frame, two_chunks[1]);
+                let selections_display = {
+                    let selections_state = self
+                        .question
+                        .selections
+                        .iter()
+                        .enumerate()
+                        .take(8)
+                        .map(|(index, sel)| {
+                            let selection_flag: u8 = 0b1 << index;
+                            ToggleButtonState {
+                                text: sel.text.clone(),
+                                selected: self.question.user_selection.is_selected(selection_flag),
+                            }
+                        })
+                        .collect();
+                    ToggleButtons::new(selections_state).wrapper(current_wrapper)
+                };
+                frame.render_widget(selections_display, two_chunks[1]);
             }
             true => {
                 // Question
                 let question_text = [Text::raw(&self.question.question)];
-                let mut question_block = Paragraph::new(question_text.iter())
+                let question_block = Paragraph::new(question_text.iter())
                     .block(
                         Block::default()
                             .borders(Borders::ALL)
@@ -490,7 +629,7 @@ impl<'a> QuestionWidget<'a> {
                         }
                     })
                     .collect();
-                let mut selections_block =
+                let selections_block =
                     ToggleButtons::new(selections_state).wrapper(current_wrapper);
 
                 // Answer
@@ -499,7 +638,7 @@ impl<'a> QuestionWidget<'a> {
                     None => "",
                 };
                 let answer_text = [Text::raw(answer)];
-                let mut answer_block = Paragraph::new(answer_text.iter())
+                let answer_block = Paragraph::new(answer_text.iter())
                     .block(Block::default().borders(Borders::TOP).title("­Answer"))
                     .scroll(self.display.question_scroll_pos)
                     .wrap(true);
@@ -507,14 +646,14 @@ impl<'a> QuestionWidget<'a> {
                 match self.question.answer.is_some() {
                     true => {
                         // Question + Selection
-                        question_block.render(frame, three_chunks[0]);
-                        selections_block.render(frame, three_chunks[1]);
-                        answer_block.render(frame, three_chunks[2]);
+                        frame.render_widget(question_block, three_chunks[0]);
+                        frame.render_widget(selections_block, three_chunks[1]);
+                        frame.render_widget(answer_block, three_chunks[2]);
                     }
                     false => {
                         // Question + Selection + Answer
-                        question_block.render(frame, two_chunks[0]);
-                        selections_block.render(frame, two_chunks[1]);
+                        frame.render_widget(question_block, two_chunks[0]);
+                        frame.render_widget(selections_block, two_chunks[1]);
                     }
                 }
             }
@@ -708,10 +847,10 @@ impl<'a> ExamItemsWidget<'a> {
             }),
         }
 
-        Paragraph::new(texts.iter())
+        let sidebar_display = Paragraph::new(texts.iter())
             .block(Block::default().borders(Borders::ALL).title("Items"))
-            .scroll(scroll_pos)
-            .render(frame, content);
+            .scroll(scroll_pos);
+        frame.render_widget(sidebar_display, content);
     }
 
     pub fn propagate(
@@ -768,9 +907,11 @@ impl<'a> JumpBarWidget<'a> {
             Text::styled(format!("{}", jumpbox_value), JUMPBOX_TEXT_STYLE),
         ];
 
-        Paragraph::new(jumpbox_text.iter())
-            .block(Block::default().borders(Borders::ALL).title("Jump to"))
-            .render(frame, content);
+        frame.render_widget(
+            Paragraph::new(jumpbox_text.iter())
+                .block(Block::default().borders(Borders::ALL).title("Jump to")),
+            content,
+        );
     }
 
     pub fn propagate(state: &App, event: Messages, tx: mpsc::Sender<Messages>) -> Option<Messages> {

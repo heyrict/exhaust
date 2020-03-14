@@ -12,8 +12,10 @@ pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> O
     match event {
         Messages::ChangeRoute(route) => {
             // Saves data when quit from DoExam route
-            if let AppRoute::DoExam = state.route {
-                maybe_save_state(&state);
+            if let AppRoute::DoExam = &state.route {
+                if let OpenMode::AutoSave = &state.home.open_mode {
+                    save_state(&state, tx.clone());
+                }
             };
 
             state.route = route;
@@ -24,27 +26,40 @@ pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> O
                 let exam = &state.exam.as_ref().unwrap();
                 let index = exam.display.question_index;
                 let question = state.exam.as_mut().unwrap().question_at_mut(index)?;
-                let returns = match question {
+                let modified = match question {
                     Item::Question(q) => {
                         if !q.has_selection(sel) {
-                            None
+                            false
                         } else {
                             if q.num_should_selects() == 1usize {
-                                q.user_selection = sel;
+                                if q.user_selection == sel {
+                                    false
+                                } else {
+                                    q.user_selection = sel;
+                                    true
+                                }
                             } else {
                                 q.user_selection ^= sel;
-                            };
-                            None
+                                true
+                            }
                         }
                     }
-                    _ => None,
+                    _ => false,
                 };
 
-                // Saves data after updating selections.
-                // This process should not block the main thread.
-                maybe_save_state(&state);
+                if modified {
+                    // Once data changed, set `unsaved_changes` to true
+                    state.exam.as_mut().map(|exam| {
+                        exam.unsaved_changes = true;
+                    });
+                    // Saves data after updating selections.
+                    // This process should not block the main thread.
+                    if let OpenMode::AutoSave = &state.home.open_mode {
+                        save_state(&state, tx.clone());
+                    }
+                }
 
-                returns
+                None
             }
             _ => Some(event),
         },
@@ -107,10 +122,10 @@ pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> O
                 } else {
                     return None;
                 };
-                let current_selected = match state.home.current_selected {
+                let current_selected = match state.home.list_state.selected() {
                     Some(k) => k,
                     None => {
-                        state.home.current_selected = Some(0);
+                        state.home.list_state.select(Some(0));
                         return None;
                     }
                 };
@@ -132,7 +147,7 @@ pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> O
                     UpdateHomeSelectedEvent::Home => 0,
                     UpdateHomeSelectedEvent::End => max_index,
                 };
-                state.home.current_selected = Some(next_index);
+                state.home.list_state.select(Some(next_index));
                 None
             }
             _ => None,
@@ -148,7 +163,7 @@ pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> O
             match filename.is_dir() {
                 true => {
                     state.home.current_path = filename.to_path_buf();
-                    state.home.current_selected = Some(0);
+                    state.home.list_state.select(Some(0));
                 }
                 false => match filename.extension() {
                     Some(ext) => match ext.to_str() {
@@ -201,44 +216,62 @@ pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> O
             state.exam = Some(exam);
             None
         }
+        Messages::ModalAction(action) => match action {
+            ModalActions::Open => {
+                state.modal.show_save_model = true;
+                None
+            }
+            ModalActions::Okay => {
+                save_state(&state, tx.clone());
+                state.modal.show_save_model = false;
+                None
+            }
+            ModalActions::Cancel => {
+                state.modal.show_save_model = false;
+                None
+            }
+        },
+        Messages::UnsavedChanges(uc) => {
+            state.exam.as_mut().map(|exam| {
+                exam.unsaved_changes = uc;
+            });
+            None
+        }
         _ => Some(event),
     }
 }
 
-pub fn maybe_save_state(state: &App) -> Option<JoinHandle<()>> {
+pub fn save_state(state: &App, tx: mpsc::Sender<Messages>) -> Option<JoinHandle<()>> {
     // Save data on selection change
-    if let OpenMode::AutoSave = &state.home.open_mode {
-        let exam_copy = state.exam.clone();
-        let maybe_filename = state.home.get_selected_path();
-        let pretty_printing = state.config.pretty_printing;
-        Some(thread::spawn(move || {
-            maybe_filename.map(|filename| {
-                let file = File::create(&filename)
-                    .expect(&format!("Error opening {}", &filename.to_str().unwrap()));
-                match filename.extension() {
-                    Some(ext) => match ext.to_str() {
-                        Some("json") => match pretty_printing {
-                            false => serde_json::to_writer(&file, &exam_copy),
-                            true => serde_json::to_writer_pretty(&file, &exam_copy),
+    let exam_copy = state.exam.clone();
+    let maybe_filename = state.home.get_selected_path();
+    let pretty_printing = state.config.pretty_printing;
+
+    Some(thread::spawn(move || {
+        maybe_filename.map(|filename| {
+            let file = File::create(&filename)
+                .expect(&format!("Error opening {}", &filename.to_str().unwrap()));
+            match filename.extension() {
+                Some(ext) => match ext.to_str() {
+                    Some("json") => match pretty_printing {
+                        false => serde_json::to_writer(&file, &exam_copy),
+                        true => serde_json::to_writer_pretty(&file, &exam_copy),
+                    }
+                    .expect(&format!("Error writing {}", &filename.to_str().unwrap())),
+                    Some("exhaust") | Some("gz") => {
+                        let mut encoder = Encoder::new(file).expect("Unable to initialize encoder");
+                        match pretty_printing {
+                            false => serde_json::to_writer(&mut encoder, &exam_copy),
+                            true => serde_json::to_writer_pretty(&mut encoder, &exam_copy),
                         }
-                        .expect(&format!("Error writing {}", &filename.to_str().unwrap())),
-                        Some("exhaust") | Some("gz") => {
-                            let mut encoder =
-                                Encoder::new(file).expect("Unable to initialize encoder");
-                            match pretty_printing {
-                                false => serde_json::to_writer(&mut encoder, &exam_copy),
-                                true => serde_json::to_writer_pretty(&mut encoder, &exam_copy),
-                            }
-                            .expect("Unable to write to file");
-                            encoder.finish();
-                        }
-                        _ => {}
-                    },
+                        .expect("Unable to write to file");
+                        encoder.finish();
+                    }
                     _ => {}
-                };
-            });
-        }))
-    } else {
-        None
-    }
+                },
+                _ => {}
+            };
+            tx.send(Messages::UnsavedChanges(false)).unwrap();
+        });
+    }))
 }

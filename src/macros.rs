@@ -5,9 +5,9 @@ pub const NONE_MODIFIER: KeyModifiers = KeyModifiers::empty();
 #[macro_use]
 macro_rules! key {
     // Control + Key
-    (^$($key:tt)*) => {
+    (^$key:literal) => {
         crossterm::event::KeyEvent {
-            code: crossterm::event::KeyCode::$($key)*,
+            code: crossterm::event::KeyCode::Char($key),
             modifiers: crossterm::event::KeyModifiers::CONTROL,
         }
     };
