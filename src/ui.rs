@@ -66,7 +66,7 @@ impl<'a> HomeWidget<'a> {
         const HIGHLIGHT_STYLE: Style = Style {
             fg: Color::Magenta,
             bg: Color::Reset,
-            modifier: Modifier::REVERSED,
+            modifier: Modifier::empty(),
         };
         const CURRENT_PATH_STYLE: Style = Style {
             fg: Color::Green,
@@ -79,19 +79,25 @@ impl<'a> HomeWidget<'a> {
             Text::raw("Welcome! Choose a file to start:\n\nCurrent Path: "),
             Text::styled(pwd, CURRENT_PATH_STYLE),
         ];
-        let footer_messages: [Text; 7] = [
+        let footer_messages = [
             Text::raw("["),
             Text::styled("q", UNDERLINE_STYLE),
             Text::raw(": Quit] | ["),
-            match self.app.home.open_mode {
-                OpenMode::ReadOnly => Text::styled("ReadOnly", HIGHLIGHT_STYLE),
-                OpenMode::Write => Text::styled("ReadOnly", Style::default()),
-            },
-            Text::raw("|"),
-            match self.app.home.open_mode {
-                OpenMode::ReadOnly => Text::styled("Write", Style::default()),
-                OpenMode::Write => Text::styled("Write", HIGHLIGHT_STYLE),
-            },
+            Text::styled(
+                "A",
+                match self.app.home.open_mode {
+                    OpenMode::NoAutoSave => Style::default(),
+                    OpenMode::AutoSave => HIGHLIGHT_STYLE,
+                }
+                .modifier(Modifier::UNDERLINED),
+            ),
+            Text::styled(
+                "utoSave",
+                match self.app.home.open_mode {
+                    OpenMode::NoAutoSave => Style::default(),
+                    OpenMode::AutoSave => HIGHLIGHT_STYLE,
+                },
+            ),
             Text::raw("]"),
         ];
         let paths = self.app.home.get_paths().unwrap();
@@ -140,11 +146,7 @@ impl<'a> HomeWidget<'a> {
             .render(frame, chunks[1]);
     }
 
-    pub fn propagate(
-        _state: &App,
-        event: Messages,
-        tx: mpsc::Sender<Messages>,
-    ) -> Option<Messages> {
+    pub fn propagate(state: &App, event: Messages, tx: mpsc::Sender<Messages>) -> Option<Messages> {
         match &event {
             Messages::Input(keyevent) => match keyevent {
                 key!(Enter) => {
@@ -171,12 +173,13 @@ impl<'a> HomeWidget<'a> {
                         .unwrap();
                     None
                 }
-                key!('r') => {
-                    tx.send(Messages::SetOpenMode(OpenMode::ReadOnly)).unwrap();
-                    None
-                }
-                key!('w') => {
-                    tx.send(Messages::SetOpenMode(OpenMode::Write)).unwrap();
+                key!('a') => {
+                    let current_open_mode = &state.home.open_mode;
+                    tx.send(Messages::SetOpenMode(match current_open_mode {
+                        OpenMode::NoAutoSave => OpenMode::AutoSave,
+                        OpenMode::AutoSave => OpenMode::NoAutoSave,
+                    }))
+                    .unwrap();
                     None
                 }
                 key!('q') => {
@@ -220,8 +223,8 @@ impl<'a> ExamWidget<'a> {
         let filepath = self.app.home.get_selected_path().unwrap();
         let filename = filepath.file_stem().unwrap().to_str().unwrap();
         let title = match self.app.home.open_mode {
-            OpenMode::ReadOnly => format!("{} [readonly]", &filename),
-            OpenMode::Write => format!("{} [write]", &filename),
+            OpenMode::NoAutoSave => format!("{}", &filename),
+            OpenMode::AutoSave => format!("{} [autosave]", &filename),
         };
         Paragraph::new(
             [Text::Styled(

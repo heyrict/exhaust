@@ -141,13 +141,13 @@ impl Default for AppRoute {
 
 #[derive(Debug)]
 pub enum OpenMode {
-    ReadOnly,
-    Write,
+    NoAutoSave,
+    AutoSave,
 }
 
 impl Default for OpenMode {
     fn default() -> Self {
-        Self::ReadOnly
+        Self::NoAutoSave
     }
 }
 
@@ -209,6 +209,8 @@ pub struct Config {
     pub items_per_line: u16,
     #[serde(default = "Config::_default_show_usage")]
     pub show_usage: bool,
+    #[serde(default = "Config::_default_pretty_printing")]
+    pub pretty_printing: bool,
 }
 
 impl Config {
@@ -218,6 +220,9 @@ impl Config {
     const fn _default_items_per_line() -> u16 {
         5
     }
+    const fn _default_pretty_printing() -> bool {
+        false
+    }
 }
 
 impl Default for Config {
@@ -225,6 +230,7 @@ impl Default for Config {
         Self {
             items_per_line: Self::_default_items_per_line(),
             show_usage: Self::_default_show_usage(),
+            pretty_printing: Self::_default_pretty_printing(),
         }
     }
 }

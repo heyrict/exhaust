@@ -207,22 +207,29 @@ pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> O
 
 pub fn maybe_save_state(state: &App) -> Option<JoinHandle<()>> {
     // Save data on selection change
-    if let OpenMode::Write = &state.home.open_mode {
+    if let OpenMode::AutoSave = &state.home.open_mode {
         let exam_copy = state.exam.clone();
         let maybe_filename = state.home.get_selected_path();
+        let pretty_printing = state.config.pretty_printing;
         Some(thread::spawn(move || {
             maybe_filename.map(|filename| {
                 let file = File::create(&filename)
                     .expect(&format!("Error opening {}", &filename.to_str().unwrap()));
                 match filename.extension() {
                     Some(ext) => match ext.to_str() {
-                        Some("json") => serde_json::to_writer(&file, &exam_copy)
-                            .expect(&format!("Error writing {}", &filename.to_str().unwrap())),
+                        Some("json") => match pretty_printing {
+                            false => serde_json::to_writer(&file, &exam_copy),
+                            true => serde_json::to_writer_pretty(&file, &exam_copy),
+                        }
+                        .expect(&format!("Error writing {}", &filename.to_str().unwrap())),
                         Some("exhaust") | Some("gz") => {
                             let mut encoder =
                                 Encoder::new(file).expect("Unable to initialize encoder");
-                            serde_json::to_writer(&mut encoder, &exam_copy)
-                                .expect("Unable to write to file");
+                            match pretty_printing {
+                                false => serde_json::to_writer(&mut encoder, &exam_copy),
+                                true => serde_json::to_writer_pretty(&mut encoder, &exam_copy),
+                            }
+                            .expect("Unable to write to file");
                             encoder.finish();
                         }
                         _ => {}
