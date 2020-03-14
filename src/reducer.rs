@@ -114,44 +114,39 @@ pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> O
             });
             None
         }
-        Messages::UpdateHomeSelected(evt) => match &state.route {
-            AppRoute::Home => {
-                let paths = state.home.get_paths().unwrap();
-                let max_index = if paths.len() > 0 {
-                    paths.len() - 1
-                } else {
-                    return None;
-                };
-                let current_selected = match state.home.list_state.selected() {
-                    Some(k) => k,
-                    None => {
-                        state.home.list_state.select(Some(0));
-                        return None;
-                    }
-                };
-                let next_index = match &evt {
-                    UpdateHomeSelectedEvent::Next => {
-                        if current_selected < max_index {
-                            current_selected + 1
+        Messages::UpdateHomeSelected(evt) => {
+            let paths = state.home.get_paths().unwrap();
+            let max_index = if paths.len() > 0 {
+                paths.len() - 1
+            } else {
+                return None;
+            };
+            let selected = state.home.list_state.selected();
+            let next_index = match &evt {
+                UpdateHomeSelectedEvent::Next => selected
+                    .map(|selected| {
+                        if selected < max_index {
+                            selected + 1
                         } else {
                             0
                         }
-                    }
-                    UpdateHomeSelectedEvent::Prev => {
-                        if current_selected > 0 {
-                            current_selected - 1
+                    })
+                    .unwrap_or(0),
+                UpdateHomeSelectedEvent::Prev => selected
+                    .map(|selected| {
+                        if selected > 0 {
+                            selected - 1
                         } else {
                             max_index
                         }
-                    }
-                    UpdateHomeSelectedEvent::Home => 0,
-                    UpdateHomeSelectedEvent::End => max_index,
-                };
-                state.home.list_state.select(Some(next_index));
-                None
-            }
-            _ => None,
-        },
+                    })
+                    .unwrap_or(0),
+                UpdateHomeSelectedEvent::Home => 0,
+                UpdateHomeSelectedEvent::End => max_index,
+            };
+            state.home.list_state.select(Some(next_index));
+            None
+        }
         Messages::UpdateJumpboxValue(value) => {
             state.exam.as_mut().map(|exam| {
                 exam.jumpbox_value = value;
@@ -217,17 +212,30 @@ pub fn reduce(state: &mut App, event: Messages, tx: mpsc::Sender<Messages>) -> O
             None
         }
         Messages::ModalAction(action) => match action {
-            ModalActions::Open => {
-                state.modal.show_save_model = true;
+            ModalActions::Open(modal_state) => {
+                state.modal.save_modal_state = modal_state;
+                None
+            }
+            ModalActions::Quit(quit_action) => {
+                state.modal.save_modal_state = ModalState::Hidden;
+
+                match quit_action {
+                    QuitAction::BackHome => {
+                        state.route = AppRoute::Home;
+                    }
+                    QuitAction::QuitProgram => {
+                        tx.send(Messages::Quit).unwrap();
+                    }
+                };
                 None
             }
             ModalActions::Okay => {
                 save_state(&state, tx.clone());
-                state.modal.show_save_model = false;
+                state.modal.save_modal_state = ModalState::Hidden;
                 None
             }
             ModalActions::Cancel => {
-                state.modal.show_save_model = false;
+                state.modal.save_modal_state = ModalState::Hidden;
                 None
             }
         },

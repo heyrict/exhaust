@@ -62,7 +62,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         })?;
         let next_event = events.next()?;
         match next_event {
-            Messages::Input(key!('Q')) | Messages::Quit => {
+            Messages::Quit => {
                 disable_raw_mode()?;
                 execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
                 terminal.show_cursor()?;

@@ -21,9 +21,23 @@ pub enum UpdateHomeSelectedEvent {
     End,
 }
 
+#[derive(Clone, Debug)]
+pub enum QuitAction {
+    QuitProgram,
+    BackHome,
+}
+
+#[derive(Debug)]
+pub enum ModalState {
+    Hidden,
+    ShowSave,
+    ShowQuit(QuitAction),
+}
+
 #[derive(Debug)]
 pub enum ModalActions {
-    Open,
+    Open(ModalState),
+    Quit(QuitAction),
     Okay,
     Cancel,
 }

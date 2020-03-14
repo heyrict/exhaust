@@ -1,3 +1,4 @@
+use crate::event::ModalState;
 use dirs::config_dir;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -207,13 +208,13 @@ impl Home {
 }
 
 pub struct Modal {
-    pub show_save_model: bool,
+    pub save_modal_state: ModalState,
 }
 
 impl Default for Modal {
     fn default() -> Modal {
         Modal {
-            show_save_model: false,
+            save_modal_state: ModalState::Hidden,
         }
     }
 }

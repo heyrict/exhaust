@@ -41,26 +41,36 @@ impl<'a> AppWidget<'a> {
         };
 
         // Overlay modals
-        if self.app.modal.show_save_model {
-            let filename = self.app.home.get_selected_path().unwrap();
-            let save_modal_message = format!("Save changes to \"{}\"?", filename.to_str().unwrap());
-
-            SaveModalWidget::new(self.app, &save_modal_message).draw(frame, content);
+        match self.app.modal.save_modal_state {
+            ModalState::ShowSave => {
+                SaveModalWidget::new(self.app).draw(frame, content);
+            }
+            ModalState::ShowQuit(_) => {
+                SaveModalWidget::new(self.app).draw(frame, content);
+            }
+            _ => {}
         }
     }
 
     pub fn propagate(state: &App, event: Messages, tx: mpsc::Sender<Messages>) -> Option<Messages> {
         // Propagation
-        match event {
-            Messages::Input(key!(^'s')) => {
-                tx.send(Messages::ModalAction(ModalActions::Open)).unwrap();
+        match &event {
+            Messages::Input(key!('Q')) => {
+                state.exam.as_ref().map(|exam| match exam.unsaved_changes {
+                    true => tx
+                        .send(Messages::ModalAction(ModalActions::Open(
+                            ModalState::ShowQuit(QuitAction::QuitProgram),
+                        )))
+                        .unwrap(),
+                    false => tx.send(Messages::Quit).unwrap(),
+                });
                 None
             }
             _ => Some(event),
         }
-        .and_then(|event| match &state.modal.show_save_model {
-            true => SaveModalWidget::propagate(state, event, tx.clone()),
-            false => Some(event),
+        .and_then(|event| match &state.modal.save_modal_state {
+            ModalState::Hidden => Some(event),
+            _ => SaveModalWidget::propagate(state, event, tx.clone()),
         })
         .and_then(|event| match state.route {
             AppRoute::Home => HomeWidget::propagate(state, event, tx),
@@ -70,13 +80,12 @@ impl<'a> AppWidget<'a> {
 }
 
 pub struct SaveModalWidget<'a> {
-    _app: &'a App,
-    text: &'a str,
+    app: &'a App,
 }
 
 impl<'a> SaveModalWidget<'a> {
-    pub fn new(app: &'a App, text: &'a str) -> Self {
-        SaveModalWidget { _app: app, text }
+    pub fn new(app: &'a App) -> Self {
+        SaveModalWidget { app }
     }
 
     pub fn draw<B: Backend>(&mut self, frame: &mut Frame<B>, content: Rect) {
@@ -92,6 +101,14 @@ impl<'a> SaveModalWidget<'a> {
         };
         const BTN_WIDTH: u16 = 8;
 
+        let modal_state = &self.app.modal.save_modal_state;
+
+        let num_btns = match modal_state {
+            ModalState::ShowQuit(_) => 3,
+            ModalState::ShowSave => 2,
+            _ => unreachable!(),
+        };
+
         // When the terminal is at least 30x10 large, set paddings
         // around the modal.
         let padding_x = if content.width > 30 {
@@ -105,7 +122,7 @@ impl<'a> SaveModalWidget<'a> {
             0
         };
         let inner_width = content.width - padding_x * 2 - 2;
-        let btn_pad_around = (inner_width - BTN_WIDTH * 2) / 3;
+        let btn_pad_around = (inner_width - BTN_WIDTH * 2) / (num_btns + 1);
 
         let layout = Layout::default()
             .vertical_margin(padding_y)
@@ -114,7 +131,17 @@ impl<'a> SaveModalWidget<'a> {
             .constraints([Constraint::Min(6), Constraint::Length(2)].as_ref())
             .split(content);
 
-        let description_texts = [Text::raw(self.text)];
+        let filename = self.app.home.get_selected_path().unwrap();
+        let description_text = match modal_state {
+            ModalState::ShowSave => format!("Save changes to \"{}\"?", filename.to_str().unwrap()),
+            ModalState::ShowQuit(_) => format!(
+                "Save changes to \"{}\" before quit?",
+                filename.to_str().unwrap()
+            ),
+            _ => unreachable!(),
+        };
+        let description_texts = [Text::raw(description_text)];
+
         frame.render_widget(
             Paragraph::new(description_texts.iter())
                 .wrap(true)
@@ -129,21 +156,40 @@ impl<'a> SaveModalWidget<'a> {
             layout[0],
         );
 
-        let pad_text = Text::raw(" ".repeat(btn_pad_around as usize));
-        let btn_group = [
-            &pad_text,
-            &Text::styled("  ", BUTTON_STYLE),
-            &Text::styled("O", BUTTON_STYLE.modifier(Modifier::UNDERLINED)),
-            &Text::styled("  K  ", BUTTON_STYLE),
-            &pad_text,
-            &Text::styled(" ", BUTTON_STYLE),
-            &Text::styled("C", BUTTON_STYLE.modifier(Modifier::UNDERLINED)),
-            &Text::styled("ANCEL ", BUTTON_STYLE),
-            &pad_text,
-        ];
+        let pad_text = || Text::raw(" ".repeat(btn_pad_around as usize));
+
+        let btn_group = match modal_state {
+            ModalState::ShowSave => vec![
+                pad_text(),
+                Text::styled("   ", BUTTON_STYLE),
+                Text::styled("O", BUTTON_STYLE.modifier(Modifier::UNDERLINED)),
+                Text::styled("K   ", BUTTON_STYLE),
+                pad_text(),
+                Text::styled(" ", BUTTON_STYLE),
+                Text::styled("C", BUTTON_STYLE.modifier(Modifier::UNDERLINED)),
+                Text::styled("ANCEL ", BUTTON_STYLE),
+                pad_text(),
+            ],
+            ModalState::ShowQuit(_) => vec![
+                pad_text(),
+                Text::styled("  ", BUTTON_STYLE),
+                Text::styled("Q", BUTTON_STYLE.modifier(Modifier::UNDERLINED)),
+                Text::styled("UIT  ", BUTTON_STYLE),
+                pad_text(),
+                Text::styled("   ", BUTTON_STYLE),
+                Text::styled("O", BUTTON_STYLE.modifier(Modifier::UNDERLINED)),
+                Text::styled("K   ", BUTTON_STYLE),
+                pad_text(),
+                Text::styled(" ", BUTTON_STYLE),
+                Text::styled("C", BUTTON_STYLE.modifier(Modifier::UNDERLINED)),
+                Text::styled("ANCEL ", BUTTON_STYLE),
+                pad_text(),
+            ],
+            _ => unreachable!(),
+        };
 
         frame.render_widget(
-            Paragraph::new(btn_group.iter().map(|txt| *txt))
+            Paragraph::new(btn_group.iter())
                 .block(
                     Block::default()
                         .clean(true)
@@ -155,23 +201,45 @@ impl<'a> SaveModalWidget<'a> {
         );
     }
 
-    pub fn propagate(
-        _state: &App,
-        event: Messages,
-        tx: mpsc::Sender<Messages>,
-    ) -> Option<Messages> {
-        match event {
-            Messages::Input(keyevent) => match keyevent {
-                key!('o') | key!('O') => {
-                    tx.send(Messages::ModalAction(ModalActions::Okay)).unwrap();
-                }
-                key!('c') | key!('C') | key!(Esc) => {
-                    tx.send(Messages::ModalAction(ModalActions::Cancel))
-                        .unwrap();
-                }
+    pub fn propagate(state: &App, event: Messages, tx: mpsc::Sender<Messages>) -> Option<Messages> {
+        let modal_state = &state.modal.save_modal_state;
+        match modal_state {
+            ModalState::ShowQuit(quit_action) => match event {
+                Messages::Input(keyevent) => match keyevent {
+                    key!('q') | key!('Q') => {
+                        let action = ModalActions::Quit(quit_action.clone());
+                        tx.send(Messages::ModalAction(action)).unwrap();
+                    }
+                    key!('o') | key!('O') => {
+                        tx.send(Messages::ModalAction(ModalActions::Okay))
+                            .and_then(|_| {
+                                let action = ModalActions::Quit(quit_action.clone());
+                                tx.send(Messages::ModalAction(action))
+                            })
+                            .unwrap();
+                    }
+                    key!('c') | key!('C') | key!(Esc) => {
+                        tx.send(Messages::ModalAction(ModalActions::Cancel))
+                            .unwrap();
+                    }
+                    _ => {}
+                },
                 _ => {}
             },
-            _ => {}
+            ModalState::ShowSave => match event {
+                Messages::Input(keyevent) => match keyevent {
+                    key!('o') | key!('O') => {
+                        tx.send(Messages::ModalAction(ModalActions::Okay)).unwrap();
+                    }
+                    key!('c') | key!('C') | key!(Esc) => {
+                        tx.send(Messages::ModalAction(ModalActions::Cancel))
+                            .unwrap();
+                    }
+                    _ => {}
+                },
+                _ => {}
+            },
+            ModalState::Hidden => unreachable!(),
         };
         None // Blocks all other inputs
     }
@@ -309,6 +377,13 @@ impl<'a> HomeWidget<'a> {
                 }
                 key!('q') => {
                     tx.send(Messages::Quit).unwrap();
+                    None
+                }
+                key!(^'s') => {
+                    tx.send(Messages::ModalAction(ModalActions::Open(
+                        ModalState::ShowSave,
+                    )))
+                    .unwrap();
                     None
                 }
                 _ => Some(event),
@@ -449,17 +524,18 @@ impl<'a> ExamWidget<'a> {
 
     pub fn propagate(state: &App, event: Messages, tx: mpsc::Sender<Messages>) -> Option<Messages> {
         match &event {
-            Messages::Input(keyevent) => match keyevent {
-                key!('q') => {
-                    tx.send(Messages::ChangeRoute(AppRoute::Home)).unwrap();
-                    return None;
+            Messages::Input(key!('q')) => {
+                let exam = state.exam.as_ref().unwrap();
+                match exam.unsaved_changes {
+                    true => tx
+                        .send(Messages::ModalAction(ModalActions::Open(
+                            ModalState::ShowQuit(QuitAction::BackHome),
+                        )))
+                        .unwrap(),
+                    false => tx.send(Messages::ChangeRoute(AppRoute::Home)).unwrap(),
                 }
-                key!(' ') => {
-                    tx.send(Messages::ToggleExamResult).unwrap();
-                    return None;
-                }
-                _ => {}
-            },
+                return None;
+            }
             _ => {}
         };
         ExamItemsWidget::propagate(state, event, tx.clone())
@@ -492,17 +568,12 @@ impl<'a> ItemWidget<'a> {
     }
 
     pub fn propagate(state: &App, event: Messages, tx: mpsc::Sender<Messages>) -> Option<Messages> {
-        match &state.route {
-            AppRoute::DoExam => {
-                let exam = state.exam.as_ref().unwrap();
-                match exam.question_at(exam.display.question_index) {
-                    Some(item) => match item {
-                        Item::Question(_) => QuestionWidget::propagate(state, event, tx),
-                        _ => Some(event),
-                    },
-                    _ => Some(event),
-                }
-            }
+        let exam = state.exam.as_ref().unwrap();
+        match exam.question_at(exam.display.question_index) {
+            Some(item) => match item {
+                Item::Question(_) => QuestionWidget::propagate(state, event, tx),
+                _ => Some(event),
+            },
             _ => Some(event),
         }
     }
@@ -721,6 +792,10 @@ impl<'a> QuestionWidget<'a> {
                         tx.send(Messages::ScrollQuestion(next_pos)).unwrap();
                     });
                     None
+                }
+                key!(' ') => {
+                    tx.send(Messages::ToggleExamResult).unwrap();
+                    return None;
                 }
                 _ => Some(event),
             },
