@@ -14,7 +14,7 @@ pub enum UpdateQuestionIndexEvent {
 }
 
 #[derive(Debug)]
-pub enum UpdateHomeSelectedEvent {
+pub enum UpdateListSelectedEvent {
     Next,
     Prev,
     Home,
@@ -28,18 +28,26 @@ pub enum QuitAction {
 }
 
 #[derive(Debug)]
-pub enum ModalState {
+pub enum SaveModalState {
     Hidden,
     ShowSave,
     ShowQuit(QuitAction),
 }
 
 #[derive(Debug)]
-pub enum ModalActions {
-    Open(ModalState),
+pub enum SaveModalActions {
+    Open(SaveModalState),
     Quit(QuitAction),
     Okay,
     Cancel,
+}
+
+#[derive(Debug)]
+pub enum AssetsModalActions {
+    Open,
+    Select(UpdateListSelectedEvent),
+    OpenFile,
+    Close,
 }
 
 #[derive(Debug)]
@@ -49,11 +57,12 @@ pub enum Messages {
     ChangeRoute(AppRoute),
     UpdateQuestionIndex(UpdateQuestionIndexEvent),
     ScrollQuestion(u16),
-    UpdateHomeSelected(UpdateHomeSelectedEvent),
+    UpdateHomeSelected(UpdateListSelectedEvent),
     UpdateJumpboxValue(u16),
     ToggleSelection(SelectionFlags),
     LoadFile,
-    ModalAction(ModalActions),
+    SaveModalAction(SaveModalActions),
+    AssetsModalAction(AssetsModalActions),
     UnsavedChanges(bool),
     FileLoaded(Exam),
     SetOpenMode(OpenMode),

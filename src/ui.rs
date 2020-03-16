@@ -24,6 +24,61 @@ use crate::app::*;
 use crate::event::*;
 use crate::toggle_buttons::*;
 
+const BG_STYLE: Style = Style {
+    fg: Color::Reset,
+    bg: Color::Gray,
+    modifier: Modifier::empty(),
+};
+const BUTTON_STYLE: Style = Style {
+    fg: Color::White,
+    bg: Color::Magenta,
+    modifier: Modifier::empty(),
+};
+const BTN_WIDTH: u16 = 8;
+
+struct ModalRect {
+    content: Rect,
+    px: u16,
+    py: u16,
+}
+
+impl Into<Rect> for ModalRect {
+    fn into(self) -> Rect {
+        Rect {
+            x: self.content.x + self.px,
+            y: self.content.y + self.py,
+            width: self.content.width - self.px * 2,
+            height: self.content.height - self.py * 2,
+        }
+    }
+}
+
+impl ModalRect {
+    fn new(content: Rect) -> Self {
+        // When the terminal is at least 30x10 large, set paddings
+        // around the modal.
+        let px = if content.width > 30 {
+            (content.width - 30) / 5
+        } else {
+            0
+        };
+        let py = if content.height > 10 {
+            (content.height - 10) / 3
+        } else {
+            0
+        };
+
+        Self { content, px, py }
+    }
+
+    fn btn_pad(&self, num_btns: u16) -> u16 {
+        let inner_width = self.content.width - self.px * 2 - 2;
+
+        // pad-around
+        (inner_width - BTN_WIDTH * num_btns) / (num_btns + 1)
+    }
+}
+
 pub struct AppWidget<'a> {
     app: &'a mut App,
 }
@@ -42,11 +97,17 @@ impl<'a> AppWidget<'a> {
 
         // Overlay modals
         match self.app.modal.save_modal_state {
-            ModalState::ShowSave => {
+            SaveModalState::ShowSave => {
                 SaveModalWidget::new(self.app).draw(frame, content);
             }
-            ModalState::ShowQuit(_) => {
+            SaveModalState::ShowQuit(_) => {
                 SaveModalWidget::new(self.app).draw(frame, content);
+            }
+            _ => {}
+        }
+        match self.app.modal.assets_modal_state {
+            AssetsModalState::Show(_) => {
+                AssetsModalWidget::new(self.app).draw(frame, content);
             }
             _ => {}
         }
@@ -56,10 +117,15 @@ impl<'a> AppWidget<'a> {
         // Propagation
         match &event {
             Messages::Input(key!('Q')) => {
+                // Do not ask when quit from home
+                if let AppRoute::Home = state.route {
+                    return None;
+                };
+
                 state.exam.as_ref().map(|exam| match exam.unsaved_changes {
                     true => tx
-                        .send(Messages::ModalAction(ModalActions::Open(
-                            ModalState::ShowQuit(QuitAction::QuitProgram),
+                        .send(Messages::SaveModalAction(SaveModalActions::Open(
+                            SaveModalState::ShowQuit(QuitAction::QuitProgram),
                         )))
                         .unwrap(),
                     false => tx.send(Messages::Quit).unwrap(),
@@ -69,8 +135,12 @@ impl<'a> AppWidget<'a> {
             _ => Some(event),
         }
         .and_then(|event| match &state.modal.save_modal_state {
-            ModalState::Hidden => Some(event),
+            SaveModalState::Hidden => Some(event),
             _ => SaveModalWidget::propagate(state, event, tx.clone()),
+        })
+        .and_then(|event| match &state.modal.assets_modal_state {
+            AssetsModalState::Hidden => Some(event),
+            _ => AssetsModalWidget::propagate(state, event, tx.clone()),
         })
         .and_then(|event| match state.route {
             AppRoute::Home => HomeWidget::propagate(state, event, tx),
@@ -89,52 +159,28 @@ impl<'a> SaveModalWidget<'a> {
     }
 
     pub fn draw<B: Backend>(&mut self, frame: &mut Frame<B>, content: Rect) {
-        const BG_STYLE: Style = Style {
-            fg: Color::Reset,
-            bg: Color::Gray,
-            modifier: Modifier::empty(),
-        };
-        const BUTTON_STYLE: Style = Style {
-            fg: Color::White,
-            bg: Color::Magenta,
-            modifier: Modifier::empty(),
-        };
-        const BTN_WIDTH: u16 = 8;
-
         let modal_state = &self.app.modal.save_modal_state;
 
         let num_btns = match modal_state {
-            ModalState::ShowQuit(_) => 3,
-            ModalState::ShowSave => 2,
+            SaveModalState::ShowQuit(_) => 3,
+            SaveModalState::ShowSave => 2,
             _ => unreachable!(),
         };
 
-        // When the terminal is at least 30x10 large, set paddings
-        // around the modal.
-        let padding_x = if content.width > 30 {
-            (content.width - 30) / 5
-        } else {
-            0
-        };
-        let padding_y = if content.height > 10 {
-            (content.height - 10) / 3
-        } else {
-            0
-        };
-        let inner_width = content.width - padding_x * 2 - 2;
-        let btn_pad_around = (inner_width - BTN_WIDTH * 2) / (num_btns + 1);
+        let content = ModalRect::new(content);
+        let btn_pad = content.btn_pad(num_btns);
 
         let layout = Layout::default()
-            .vertical_margin(padding_y)
-            .horizontal_margin(padding_x)
             .direction(Direction::Vertical)
             .constraints([Constraint::Min(6), Constraint::Length(2)].as_ref())
-            .split(content);
+            .split(content.into());
 
         let filename = self.app.home.get_selected_path().unwrap();
         let description_text = match modal_state {
-            ModalState::ShowSave => format!("Save changes to \"{}\"?", filename.to_str().unwrap()),
-            ModalState::ShowQuit(_) => format!(
+            SaveModalState::ShowSave => {
+                format!("Save changes to \"{}\"?", filename.to_str().unwrap())
+            }
+            SaveModalState::ShowQuit(_) => format!(
                 "Save changes to \"{}\" before quit?",
                 filename.to_str().unwrap()
             ),
@@ -149,17 +195,17 @@ impl<'a> SaveModalWidget<'a> {
                 .block(
                     Block::default()
                         .clean(true)
-                        .borders(Borders::LEFT | Borders::RIGHT | Borders::TOP)
+                        .borders(Borders::ALL - Borders::BOTTOM)
                         .border_style(BG_STYLE),
                 )
                 .style(BG_STYLE),
             layout[0],
         );
 
-        let pad_text = || Text::raw(" ".repeat(btn_pad_around as usize));
+        let pad_text = || Text::raw(" ".repeat(btn_pad as usize));
 
         let btn_group = match modal_state {
-            ModalState::ShowSave => vec![
+            SaveModalState::ShowSave => vec![
                 pad_text(),
                 Text::styled("   ", BUTTON_STYLE),
                 Text::styled("O", BUTTON_STYLE.modifier(Modifier::UNDERLINED)),
@@ -170,7 +216,7 @@ impl<'a> SaveModalWidget<'a> {
                 Text::styled("ANCEL ", BUTTON_STYLE),
                 pad_text(),
             ],
-            ModalState::ShowQuit(_) => vec![
+            SaveModalState::ShowQuit(_) => vec![
                 pad_text(),
                 Text::styled("  ", BUTTON_STYLE),
                 Text::styled("Q", BUTTON_STYLE.modifier(Modifier::UNDERLINED)),
@@ -193,7 +239,7 @@ impl<'a> SaveModalWidget<'a> {
                 .block(
                     Block::default()
                         .clean(true)
-                        .borders(Borders::LEFT | Borders::RIGHT | Borders::BOTTOM)
+                        .borders(Borders::ALL - Borders::TOP)
                         .border_style(BG_STYLE),
                 )
                 .style(BG_STYLE),
@@ -204,42 +250,177 @@ impl<'a> SaveModalWidget<'a> {
     pub fn propagate(state: &App, event: Messages, tx: mpsc::Sender<Messages>) -> Option<Messages> {
         let modal_state = &state.modal.save_modal_state;
         match modal_state {
-            ModalState::ShowQuit(quit_action) => match event {
+            SaveModalState::ShowQuit(quit_action) => match event {
                 Messages::Input(keyevent) => match keyevent {
                     key!('q') | key!('Q') => {
-                        let action = ModalActions::Quit(quit_action.clone());
-                        tx.send(Messages::ModalAction(action)).unwrap();
+                        let action = SaveModalActions::Quit(quit_action.clone());
+                        tx.send(Messages::SaveModalAction(action)).unwrap();
                     }
                     key!('o') | key!('O') => {
-                        tx.send(Messages::ModalAction(ModalActions::Okay))
+                        tx.send(Messages::SaveModalAction(SaveModalActions::Okay))
                             .and_then(|_| {
-                                let action = ModalActions::Quit(quit_action.clone());
-                                tx.send(Messages::ModalAction(action))
+                                let action = SaveModalActions::Quit(quit_action.clone());
+                                tx.send(Messages::SaveModalAction(action))
                             })
                             .unwrap();
                     }
                     key!('c') | key!('C') | key!(Esc) => {
-                        tx.send(Messages::ModalAction(ModalActions::Cancel))
+                        tx.send(Messages::SaveModalAction(SaveModalActions::Cancel))
                             .unwrap();
                     }
                     _ => {}
                 },
                 _ => {}
             },
-            ModalState::ShowSave => match event {
+            SaveModalState::ShowSave => match event {
                 Messages::Input(keyevent) => match keyevent {
                     key!('o') | key!('O') => {
-                        tx.send(Messages::ModalAction(ModalActions::Okay)).unwrap();
+                        tx.send(Messages::SaveModalAction(SaveModalActions::Okay))
+                            .unwrap();
                     }
                     key!('c') | key!('C') | key!(Esc) => {
-                        tx.send(Messages::ModalAction(ModalActions::Cancel))
+                        tx.send(Messages::SaveModalAction(SaveModalActions::Cancel))
                             .unwrap();
                     }
                     _ => {}
                 },
                 _ => {}
             },
-            ModalState::Hidden => unreachable!(),
+            SaveModalState::Hidden => unreachable!(),
+        };
+        None // Blocks all other inputs
+    }
+}
+
+pub struct AssetsModalWidget<'a> {
+    app: &'a mut App,
+}
+
+impl<'a> AssetsModalWidget<'a> {
+    pub fn new(app: &'a mut App) -> Self {
+        AssetsModalWidget { app }
+    }
+
+    pub fn draw<B: Backend>(&mut self, frame: &mut Frame<B>, content: Rect) {
+        let content = ModalRect::new(content);
+        let num_btns = 1;
+        let btn_pad = content.btn_pad(num_btns);
+
+        let assets_list_state = match &mut self.app.modal.assets_modal_state {
+            AssetsModalState::Show(list_state) => list_state,
+            AssetsModalState::Hidden => unreachable!(),
+        };
+        let exam = self.app.exam.as_ref().unwrap();
+        let current_item = exam.question_at(exam.display.question_index).unwrap();
+        let assets = current_item.get_assets();
+
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(
+                [
+                    Constraint::Length(2),
+                    Constraint::Min(4),
+                    Constraint::Length(2),
+                ]
+                .as_ref(),
+            )
+            .split(content.into());
+
+        // Title
+        let title_texts = [Text::styled("Assets", BG_STYLE.modifier(Modifier::BOLD))];
+        frame.render_widget(
+            Paragraph::new(title_texts.iter())
+                .alignment(Alignment::Center)
+                .block(
+                    Block::default()
+                        .clean(true)
+                        .borders(Borders::ALL - Borders::BOTTOM)
+                        .border_style(BG_STYLE),
+                )
+                .style(BG_STYLE),
+            layout[0],
+        );
+
+        // Assets list
+        frame.render_stateful_widget(
+            List::new(assets.iter().map(|text| Text::raw(text)))
+                .highlight_symbol(">")
+                .highlight_style(BG_STYLE)
+                .block(
+                    Block::default()
+                        .clean(true)
+                        .borders(Borders::LEFT | Borders::RIGHT)
+                        .border_style(BG_STYLE),
+                )
+                .style(BG_STYLE),
+            layout[1],
+            assets_list_state,
+        );
+
+        // The buttons
+        let pad_text = || Text::raw(" ".repeat(btn_pad as usize));
+        let btn_group = vec![
+            pad_text(),
+            Text::styled(" ", BUTTON_STYLE),
+            Text::styled("C", BUTTON_STYLE.modifier(Modifier::UNDERLINED)),
+            Text::styled("LOSE ", BUTTON_STYLE),
+            pad_text(),
+        ];
+        frame.render_widget(
+            Paragraph::new(btn_group.iter())
+                .block(
+                    Block::default()
+                        .clean(true)
+                        .borders(Borders::ALL - Borders::TOP)
+                        .border_style(BG_STYLE),
+                )
+                .style(BG_STYLE),
+            layout[2],
+        );
+    }
+
+    pub fn propagate(
+        _state: &App,
+        event: Messages,
+        tx: mpsc::Sender<Messages>,
+    ) -> Option<Messages> {
+        match event {
+            Messages::Input(keyevent) => match keyevent {
+                key!(Enter) => {
+                    tx.send(Messages::AssetsModalAction(AssetsModalActions::OpenFile))
+                        .unwrap();
+                }
+                key!('c') | key!('C') | key!(Esc) => {
+                    tx.send(Messages::AssetsModalAction(AssetsModalActions::Close))
+                        .unwrap();
+                }
+                key!('j') | key!(Down) => {
+                    tx.send(Messages::AssetsModalAction(AssetsModalActions::Select(
+                        UpdateListSelectedEvent::Next,
+                    )))
+                    .unwrap();
+                }
+                key!('k') | key!(Up) => {
+                    tx.send(Messages::AssetsModalAction(AssetsModalActions::Select(
+                        UpdateListSelectedEvent::Prev,
+                    )))
+                    .unwrap();
+                }
+                key!('g') => {
+                    tx.send(Messages::AssetsModalAction(AssetsModalActions::Select(
+                        UpdateListSelectedEvent::Home,
+                    )))
+                    .unwrap();
+                }
+                key!('G') => {
+                    tx.send(Messages::AssetsModalAction(AssetsModalActions::Select(
+                        UpdateListSelectedEvent::End,
+                    )))
+                    .unwrap();
+                }
+                _ => {}
+            },
+            _ => {}
         };
         None // Blocks all other inputs
     }
@@ -347,22 +528,22 @@ impl<'a> HomeWidget<'a> {
                     None
                 }
                 key!('j') | key!(Down) => {
-                    tx.send(Messages::UpdateHomeSelected(UpdateHomeSelectedEvent::Next))
+                    tx.send(Messages::UpdateHomeSelected(UpdateListSelectedEvent::Next))
                         .unwrap();
                     None
                 }
                 key!('k') | key!(Up) => {
-                    tx.send(Messages::UpdateHomeSelected(UpdateHomeSelectedEvent::Prev))
+                    tx.send(Messages::UpdateHomeSelected(UpdateListSelectedEvent::Prev))
                         .unwrap();
                     None
                 }
                 key!('g') => {
-                    tx.send(Messages::UpdateHomeSelected(UpdateHomeSelectedEvent::Home))
+                    tx.send(Messages::UpdateHomeSelected(UpdateListSelectedEvent::Home))
                         .unwrap();
                     None
                 }
                 key!('G') => {
-                    tx.send(Messages::UpdateHomeSelected(UpdateHomeSelectedEvent::End))
+                    tx.send(Messages::UpdateHomeSelected(UpdateListSelectedEvent::End))
                         .unwrap();
                     None
                 }
@@ -377,13 +558,6 @@ impl<'a> HomeWidget<'a> {
                 }
                 key!('q') => {
                     tx.send(Messages::Quit).unwrap();
-                    None
-                }
-                key!(^'s') => {
-                    tx.send(Messages::ModalAction(ModalActions::Open(
-                        ModalState::ShowSave,
-                    )))
-                    .unwrap();
                     None
                 }
                 _ => Some(event),
@@ -528,18 +702,25 @@ impl<'a> ExamWidget<'a> {
                 let exam = state.exam.as_ref().unwrap();
                 match exam.unsaved_changes {
                     true => tx
-                        .send(Messages::ModalAction(ModalActions::Open(
-                            ModalState::ShowQuit(QuitAction::BackHome),
+                        .send(Messages::SaveModalAction(SaveModalActions::Open(
+                            SaveModalState::ShowQuit(QuitAction::BackHome),
                         )))
                         .unwrap(),
                     false => tx.send(Messages::ChangeRoute(AppRoute::Home)).unwrap(),
                 }
                 return None;
             }
+            Messages::Input(key!(^'s')) => {
+                tx.send(Messages::SaveModalAction(SaveModalActions::Open(
+                    SaveModalState::ShowSave,
+                )))
+                .unwrap();
+                return None;
+            }
             _ => {}
         };
-        ExamItemsWidget::propagate(state, event, tx.clone())
-            .and_then(|event| JumpBarWidget::propagate(state, event, tx.clone()))
+        JumpBarWidget::propagate(state, event, tx.clone())
+            .and_then(|event| ExamItemsWidget::propagate(state, event, tx.clone()))
             .and_then(|event| ItemWidget::propagate(state, event, tx))
     }
 }
@@ -569,13 +750,23 @@ impl<'a> ItemWidget<'a> {
 
     pub fn propagate(state: &App, event: Messages, tx: mpsc::Sender<Messages>) -> Option<Messages> {
         let exam = state.exam.as_ref().unwrap();
-        match exam.question_at(exam.display.question_index) {
-            Some(item) => match item {
-                Item::Question(_) => QuestionWidget::propagate(state, event, tx),
-                _ => Some(event),
-            },
+        match event {
+            Messages::Input(key!('t')) => {
+                tx.send(Messages::AssetsModalAction(AssetsModalActions::Open))
+                    .unwrap();
+                None
+            }
             _ => Some(event),
         }
+        .and_then(
+            |event| match exam.question_at(exam.display.question_index) {
+                Some(item) => match item {
+                    Item::Question(_) => QuestionWidget::propagate(state, event, tx),
+                    _ => Some(event),
+                },
+                _ => Some(event),
+            },
+        )
     }
 }
 
@@ -595,10 +786,16 @@ impl<'a> QuestionWidget<'a> {
     }
 
     pub fn draw<B: Backend>(&mut self, frame: &mut Frame<B>, content: Rect) {
+        const ASSETS_STYLE: Style = Style {
+            fg: Color::Red,
+            bg: Color::Reset,
+            modifier: Modifier::empty(),
+        };
+        let exam = &self.app.exam.as_ref().unwrap();
         let question_title = format!(
             "Question ({}/{})",
             &self.display.question_index + 1,
-            &self.app.exam.as_ref().unwrap().num_questions()
+            exam.num_questions()
         );
         const WRAPPER_SELECT: [&str; 2] = ["(", ")"];
         const WRAPPER_MULTSEL: [&str; 2] = ["[", "]"];
@@ -607,6 +804,19 @@ impl<'a> QuestionWidget<'a> {
         } else {
             WRAPPER_MULTSEL
         };
+
+        // Adds indicator for assets
+        let mut question_display = vec![Text::raw(&self.question.question)];
+        let current_item = exam.question_at(exam.display.question_index).unwrap();
+        let num_assets = current_item.get_assets().len();
+        if num_assets > 0 {
+            question_display.push(Text::styled("\n\n[Asse", ASSETS_STYLE));
+            question_display.push(Text::styled(
+                "t",
+                ASSETS_STYLE.modifier(Modifier::UNDERLINED),
+            ));
+            question_display.push(Text::styled(format!("s: {}]", num_assets), ASSETS_STYLE));
+        }
 
         // Question + Selections
         let two_chunks = Layout::default()
@@ -626,11 +836,11 @@ impl<'a> QuestionWidget<'a> {
             )
             .split(content);
 
-        match self.app.exam.as_ref().unwrap().display.display_answer {
+        match exam.display.display_answer {
             false => {
                 // Question
                 frame.render_widget(
-                    Paragraph::new([Text::raw(&self.question.question)].iter())
+                    Paragraph::new(question_display.iter())
                         .block(
                             Block::default()
                                 .borders(Borders::ALL)

@@ -1,4 +1,4 @@
-use crate::event::ModalState;
+use crate::event::SaveModalState;
 use dirs::config_dir;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -49,6 +49,8 @@ pub struct Question {
     pub answer: Option<String>,
     #[serde(default, with = "selection_flags_serde")]
     pub user_selection: SelectionFlags,
+    #[serde(default)]
+    pub assets: Vec<String>,
     #[serde(flatten)]
     pub extra: HashMap<String, serde_json::Value>,
 }
@@ -82,8 +84,9 @@ impl HasQuestionResult for Question {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Card {
-    question: String,
-    answer: String,
+    pub question: String,
+    pub answer: String,
+    pub assets: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -207,14 +210,21 @@ impl Home {
     }
 }
 
+pub enum AssetsModalState {
+    Hidden,
+    Show(ListState),
+}
+
 pub struct Modal {
-    pub save_modal_state: ModalState,
+    pub save_modal_state: SaveModalState,
+    pub assets_modal_state: AssetsModalState,
 }
 
 impl Default for Modal {
     fn default() -> Modal {
         Modal {
-            save_modal_state: ModalState::Hidden,
+            save_modal_state: SaveModalState::Hidden,
+            assets_modal_state: AssetsModalState::Hidden,
         }
     }
 }
@@ -227,6 +237,8 @@ pub struct Config {
     pub show_usage: bool,
     #[serde(default = "Config::_default_pretty_printing")]
     pub pretty_printing: bool,
+    #[serde(default = "Config::_default_launcher")]
+    pub launcher: String,
 }
 
 impl Config {
@@ -239,6 +251,20 @@ impl Config {
     const fn _default_pretty_printing() -> bool {
         false
     }
+    fn _default_launcher() -> String {
+        #[cfg(target_os = "macos")]
+        {
+            "open".to_owned()
+        }
+        #[cfg(target_os = "linux")]
+        {
+            "xdg-open".to_owned()
+        }
+        #[cfg(target_os = "windows")]
+        {
+            "explorer".to_owned()
+        }
+    }
 }
 
 impl Default for Config {
@@ -247,6 +273,7 @@ impl Default for Config {
             items_per_line: Self::_default_items_per_line(),
             show_usage: Self::_default_show_usage(),
             pretty_printing: Self::_default_pretty_printing(),
+            launcher: Self::_default_launcher(),
         }
     }
 }
@@ -303,6 +330,15 @@ impl Exam {
 
     pub fn num_questions(&self) -> usize {
         self.questions.len()
+    }
+}
+
+impl Item {
+    pub fn get_assets(&self) -> &Vec<String> {
+        match self {
+            Item::Question(question) => &question.assets,
+            Item::Card(card) => &card.assets,
+        }
     }
 }
 
