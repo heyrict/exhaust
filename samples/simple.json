@@ -2,12 +2,17 @@
   "questions": [
     {
       "type": "Question",
-      "question": "Game Over. Continue?",
+      "question": "How old are you?",
       "selections": [
-        { "text": "No", "should_select": false },
-        { "text": "Yes", "should_select": true }
-      ],
-      "answer": "You should select yes"
+        { "text": "< 10 y/o" },
+        { "text": "10 - 20 y/o" },
+        { "text": "20 - 30 y/o" },
+        { "text": "30 - 40 y/o" },
+        { "text": "40 - 50 y/o" },
+        { "text": "50 - 60 y/o" },
+        { "text": "60 - 70 y/o" },
+        { "text": "> 70 y/o" }
+      ]
     },
     {
       "type": "Question",
