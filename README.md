@@ -5,16 +5,24 @@ A terminal app for doing exams, powered with tui-rs.
 
 ![demo](./assets/demo.png)
 
-# Usage
+## Schema
+Here is the json schema that exam files use
 
-| Key                       | Description                   |
-|---------------------------|-------------------------------|
-| `j`=Up `k`=Down           | Move cursor                   |
-| `\n`                      | Confirm                       |
-| `q`                       | Quit                          |
-| `n`,`>`=Next `p`,`<`=Prev | Change page                   |
-| `a` to `h`                | Switch selection              |
-| `r` `w`                   | Change ReadOnly/Write         |
-| `u`                       | Change to the upper directory |
-| ` `                       | Switch display mode           |
-| `0-9`, Enter, BS, Esc     | Jump to question              |
+```typescript
+type RootType = {
+  questions: QuestionType[],
+}
+
+type QuestionType = {
+  type: "Question",
+  question: string,
+  selections: SelectionType[],
+  answer: string?,
+  user_selection: SelectionMaskType,
+  assets: string[]?,
+  [key: string]: any,
+}
+
+type SelectionMaskType = number;
+
+```
