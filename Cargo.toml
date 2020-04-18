@@ -15,9 +15,7 @@ serde = { version = "^1.0", features = ["derive"] }
 serde_json = "^1.0"
 
 [dependencies.tui]
-#version = "0.8"
-git = "https://github.com/heyrict/tui-rs"
-branch = "reset-area"
+version = "0.9"
 default-features = false
 features = ["crossterm"]
 

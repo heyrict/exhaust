@@ -17,7 +17,7 @@ use std::sync::mpsc;
 use tui::backend::Backend;
 use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
-use tui::widgets::{Block, Borders, Gauge, List, Paragraph, Text};
+use tui::widgets::{Clear, Block, Borders, Gauge, List, Paragraph, Text};
 use tui::Frame;
 
 use crate::app::*;
@@ -188,13 +188,13 @@ impl<'a> SaveModalWidget<'a> {
         };
         let description_texts = [Text::raw(description_text)];
 
+        frame.render_widget(Clear, layout[0].clone());
         frame.render_widget(
             Paragraph::new(description_texts.iter())
                 .wrap(true)
                 .alignment(Alignment::Center)
                 .block(
                     Block::default()
-                        .clean(true)
                         .borders(Borders::ALL - Borders::BOTTOM)
                         .border_style(BG_STYLE),
                 )
@@ -234,11 +234,11 @@ impl<'a> SaveModalWidget<'a> {
             _ => unreachable!(),
         };
 
+        frame.render_widget(Clear, layout[1].clone());
         frame.render_widget(
             Paragraph::new(btn_group.iter())
                 .block(
                     Block::default()
-                        .clean(true)
                         .borders(Borders::ALL - Borders::TOP)
                         .border_style(BG_STYLE),
                 )
@@ -328,12 +328,12 @@ impl<'a> AssetsModalWidget<'a> {
 
         // Title
         let title_texts = [Text::styled("Assets", BG_STYLE.modifier(Modifier::BOLD))];
+        frame.render_widget(Clear, layout[0].clone());
         frame.render_widget(
             Paragraph::new(title_texts.iter())
                 .alignment(Alignment::Center)
                 .block(
                     Block::default()
-                        .clean(true)
                         .borders(Borders::ALL - Borders::BOTTOM)
                         .border_style(BG_STYLE),
                 )
@@ -342,13 +342,13 @@ impl<'a> AssetsModalWidget<'a> {
         );
 
         // Assets list
+        frame.render_widget(Clear, layout[1].clone());
         frame.render_stateful_widget(
             List::new(assets.iter().map(|text| Text::raw(text)))
                 .highlight_symbol(">")
                 .highlight_style(BG_STYLE)
                 .block(
                     Block::default()
-                        .clean(true)
                         .borders(Borders::LEFT | Borders::RIGHT)
                         .border_style(BG_STYLE),
                 )
@@ -366,11 +366,11 @@ impl<'a> AssetsModalWidget<'a> {
             Text::styled("LOSE ", BUTTON_STYLE),
             pad_text(),
         ];
+        frame.render_widget(Clear, layout[2].clone());
         frame.render_widget(
             Paragraph::new(btn_group.iter())
                 .block(
                     Block::default()
-                        .clean(true)
                         .borders(Borders::ALL - Borders::TOP)
                         .border_style(BG_STYLE),
                 )
